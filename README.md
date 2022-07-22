@@ -10,13 +10,13 @@ events), performing some side effect, and emitting events.
 Commands are processed against a provided state. Events can be applied to states
 to yield new states.
 
-For more background on [Event-driven Finite State Machines](http://christopherhunt-software.blogspot.com/2021/02/event-driven-finite-state-machines.html).
+For more background: [Event-driven Finite State Machines](http://christopherhunt-software.blogspot.com/2021/02/event-driven-finite-state-machines.html).
 
 DSL
 ---
 
-A macro has been provided that provides a Domain Specific Language intending to map directly
-from the representation of a Finite State Machine to code. Please see the tests folder for
+A macro has been provided that provides a Domain Specific Language mapping directly
+from a Finite State Machine description to code. Please see the event_driven/tests folder for
 examples.
 
 no_std
