@@ -27,7 +27,7 @@ pub fn impl_fsm(input: TokenStream, annotated_item: TokenStream) -> TokenStream 
                 ))
                 .unwrap(),
                 parse2::<ImplItem>(quote!(
-                    fn for_event(s: &State, e: &Event) -> Transition<State> {
+                    fn for_event(s: &State, e: &Event) -> Option<State> {
                         todo!()
                     }
                 ))

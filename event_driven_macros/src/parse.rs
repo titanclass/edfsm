@@ -5,7 +5,7 @@ use syn::{
     parse::{Parse, ParseStream},
     parse2,
     token::If,
-    Error, Expr, Ident, ImplItem, ImplItemMacro, ItemImpl, Pat, Path, Result, Token,
+    Error, Expr, Ident, ImplItem, ImplItemMacro, ItemImpl, Pat, Result, Token, Type,
 };
 
 #[derive(Debug)]
@@ -38,7 +38,7 @@ pub type State = ArmLhs;
 #[derive(Debug, PartialEq)]
 pub struct EntryExit {
     is_entry: bool,
-    state: Path,
+    state: Type,
 }
 
 impl Parse for EntryExit {
@@ -117,20 +117,20 @@ mod tests {
             where
                 R: RngCore + 'd,
             {
-                state!(State::Uninitialised / exit);
+                state!(Uninitialised / exit);
 
-                transition!(State::Uninitialised    => Command::GenerateRootKey                       => Event::RootKeyGenerated             => State::RootKeyGenerated);
-                transition!(State::RootKeyGenerated => Command::GenerateVpnKey                        => Event::VpnKeyGenerated              => State::VpnKeyGenerated);
-                transition!(State::VpnKeyGenerated  => Command::SetCredentials { username, password } => Event::CredentialsSet { username }  => State::CredentialsSet { entity });
-                transition!(_                       => Command::GetUsername                           => Event::UsernameRetrieved);
-                transition!(_                       => Command::Reset { factory } if factory          => Event::Reset { factory } if factory => State::Uninitialised);
-                transition!(_                       => Command::Reset { .. }                          => Event::Reset { .. }                 => State::VpnKeyGenerated);
+                transition!(Uninitialised  -> SsInitialised  : GenerateRootKey                        -> RootKeyGenerated    : RootKeyGenerated);
+                transition!(SsInitialised  -> VpnInitialised : GenerateVpnKey                         -> VpnKeyGenerated     : VpnKeyGenerated);
+                transition!(VpnInitialised -> Configurable   : SetCredentials({ username, password }) -> CredentialsSet      : CredentialsSet({ entity }));
+                transition!(_                                : GetUsername                            -> UsernameRetrieved);
+                transition!(_              -> Uninitialised  : Reset({ factory }) if factory          -> HasReset            : HasReset({ factory }) if factory);
+                transition!(_              -> VpnInitialised : Reset({ .. })                          -> HasReset            : HasReset({ .. }));
             }
         )).unwrap();
 
         assert_eq!(
             fsm.entry_exit_handlers,
-            [parse2(quote!(State::Uninitialised / exit)).unwrap()]
+            [parse2(quote!(Uninitialised / exit)).unwrap()]
         );
     }
 }
