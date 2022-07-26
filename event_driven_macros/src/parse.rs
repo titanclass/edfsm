@@ -3,37 +3,12 @@ use std::mem;
 use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
-    parse2,
-    token::If,
-    Error, Expr, Ident, ImplItem, ImplItemMacro, ItemImpl, Pat, Result, Token, Type,
+    parse2, Error, Ident, ImplItem, ImplItemMacro, ItemImpl, Result, Token, Type,
 };
 
-#[derive(Debug)]
-pub struct ArmLhs {
-    pub pat: Pat,
-    pub guard: Option<(If, Box<Expr>)>,
-}
-
-impl Parse for ArmLhs {
-    fn parse(input: ParseStream) -> Result<Self> {
-        Ok(Self {
-            pat: input.parse()?,
-            guard: {
-                if input.peek(Token![if]) {
-                    let if_token: Token![if] = input.parse()?;
-                    let guard: Expr = input.parse()?;
-                    Some((if_token, Box::new(guard)))
-                } else {
-                    None
-                }
-            },
-        })
-    }
-}
-
-pub type Command = ArmLhs;
-pub type Event = ArmLhs;
-pub type State = ArmLhs;
+pub type Command = Type;
+pub type Event = Type;
+pub type State = Type;
 
 #[derive(Debug, PartialEq)]
 pub struct EntryExit {
@@ -58,11 +33,39 @@ impl Parse for EntryExit {
     }
 }
 
+#[derive(Debug, PartialEq)]
+pub struct Transition {
+    from_state: Type,
+    command: Type,
+    event: Type,
+    to_state: Option<Type>,
+}
+
+impl Parse for Transition {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let from_state = input.parse()?;
+        input.parse::<Token![=>]>()?;
+        let command = input.parse()?;
+        input.parse::<Token![=>]>()?;
+        let event = input.parse()?;
+        let to_state = if input.parse::<Token![=>]>().is_ok() {
+            Some(input.parse()?)
+        } else {
+            None
+        };
+        Ok(Self {
+            from_state,
+            command,
+            event,
+            to_state,
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct Fsm {
-    pub command_handlers: Vec<(State, (Command, Event))>,
     pub entry_exit_handlers: Vec<EntryExit>,
-    pub event_handlers: Vec<(State, (Event, State))>,
+    pub transitions: Vec<Transition>,
     pub item_impl: ItemImpl,
 }
 
@@ -72,9 +75,8 @@ impl Parse for Fsm {
 
         let items = mem::take(&mut item_impl.items);
 
-        let command_handlers = vec![];
         let mut entry_exit_handlers = vec![];
-        let event_handlers = vec![];
+        let mut transitions = vec![];
 
         for item in items {
             if let ImplItem::Macro(ImplItemMacro { mac, .. }) = item {
@@ -84,7 +86,9 @@ impl Parse for Fsm {
                     "state" => {
                         entry_exit_handlers.push(parse2(mac.tokens)?);
                     }
-                    "transition" => {}
+                    "transition" => {
+                        transitions.push(parse2::<Transition>(mac.tokens)?);
+                    }
                     n => {
                         return Err(Error::new_spanned(mac, format!("Unknown macro: `{n}!`. Use only `state!` and `transition!` macros here.")));
                     }
@@ -98,9 +102,8 @@ impl Parse for Fsm {
         }
 
         Ok(Self {
-            command_handlers,
             entry_exit_handlers,
-            event_handlers,
+            transitions,
             item_impl,
         })
     }
@@ -119,18 +122,45 @@ mod tests {
             {
                 state!(Uninitialised / exit);
 
-                transition!(Uninitialised  -> SsInitialised  : GenerateRootKey                        -> RootKeyGenerated    : RootKeyGenerated);
-                transition!(SsInitialised  -> VpnInitialised : GenerateVpnKey                         -> VpnKeyGenerated     : VpnKeyGenerated);
-                transition!(VpnInitialised -> Configurable   : SetCredentials({ username, password }) -> CredentialsSet      : CredentialsSet({ entity }));
-                transition!(_                                : GetUsername                            -> UsernameRetrieved);
-                transition!(_              -> Uninitialised  : Reset({ factory }) if factory          -> HasReset            : HasReset({ factory }) if factory);
-                transition!(_              -> VpnInitialised : Reset({ .. })                          -> HasReset            : HasReset({ .. }));
+                transition!(Uninitialised  => GenerateRootKey => RootKeyGenerated => SsInitialised);
+                transition!(SsInitialised  => GenerateVpnKey  => VpnKeyGenerated  => VpnInitialised);
+                transition!(VpnInitialised => SetCredentials  => CredentialsSet   => Configurable);
+                transition!(_              => GetUsername     => UsernameRetrieved);
+                transition!(_              => Reset           => FactoryReset     => Uninitialised);
+                transition!(_              => Reset           => SoftReset        => VpnInitialised);
             }
         )).unwrap();
 
         assert_eq!(
             fsm.entry_exit_handlers,
             [parse2(quote!(Uninitialised / exit)).unwrap()]
+        );
+
+        assert_eq!(
+            fsm.transitions,
+            [
+                parse2(
+                    quote!(Uninitialised  => GenerateRootKey => RootKeyGenerated => SsInitialised)
+                )
+                .unwrap(),
+                parse2(
+                    quote!(SsInitialised  => GenerateVpnKey  => VpnKeyGenerated  => VpnInitialised)
+                )
+                .unwrap(),
+                parse2(
+                    quote!(VpnInitialised => SetCredentials  => CredentialsSet   => Configurable)
+                )
+                .unwrap(),
+                parse2(quote!(_              => GetUsername     => UsernameRetrieved)).unwrap(),
+                parse2(
+                    quote!(_              => Reset           => FactoryReset     => Uninitialised)
+                )
+                .unwrap(),
+                parse2(
+                    quote!(_              => Reset           => SoftReset        => VpnInitialised)
+                )
+                .unwrap(),
+            ]
         );
     }
 }

@@ -94,8 +94,8 @@ impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
     state!(Started / exit);
     state!(Stopped / exit);
 
-    transition!(State::Idle(s)    -> Running : Command::Start(c) -> Started : Event::Started(e));
-    transition!(State::Running(s) -> Idle    : Command::Stop(c)  -> Stopped : Event::Stopped(e));
+    transition!(Idle    => Start => Started => Running);
+    transition!(Running => Stop  => Stopped => Idle);
 }
 
 #[test]
