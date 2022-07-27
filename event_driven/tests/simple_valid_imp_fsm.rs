@@ -74,6 +74,30 @@ impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
     transition!(Running => Stop  => Stopped => Idle);
 }
 
+impl MyFsm {
+    fn for_running_stop_stopped(
+        _s: &Running,
+        _c: &Stop,
+        se: &mut EffectHandlers,
+    ) -> Option<Stopped> {
+        se.stop_something();
+        Some(Stopped)
+    }
+
+    fn for_idle_start_started(_s: &Idle, _c: &Start, se: &mut EffectHandlers) -> Option<Started> {
+        se.start_something();
+        Some(Started)
+    }
+
+    fn for_running_stopped_idle(_s: &Running, _e: &Stopped) -> Option<Idle> {
+        Some(Idle)
+    }
+
+    fn for_idle_started_running(_s: &Idle, _e: &Started) -> Option<Running> {
+        Some(Running)
+    }
+}
+
 #[test]
 fn main() {
     // Initialize our effect handlers
