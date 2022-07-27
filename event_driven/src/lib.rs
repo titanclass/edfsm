@@ -79,18 +79,6 @@ mod tests {
             Running(Running),
         }
 
-        impl From<Idle> for State {
-            fn from(s: Idle) -> Self {
-                State::Idle(s)
-            }
-        }
-
-        impl From<Running> for State {
-            fn from(s: Running) -> Self {
-                State::Running(s)
-            }
-        }
-
         struct Start;
         struct Stop;
 
@@ -109,18 +97,6 @@ mod tests {
         enum Event {
             Started(Started),
             Stopped(Stopped),
-        }
-
-        impl From<Started> for Event {
-            fn from(e: Started) -> Self {
-                Event::Started(e)
-            }
-        }
-
-        impl From<Stopped> for Event {
-            fn from(e: Stopped) -> Self {
-                Event::Stopped(e)
-            }
         }
 
         // Declare an object to handle effects as we step through the FSM
@@ -158,10 +134,10 @@ mod tests {
             fn for_command(s: &State, c: &Command, se: &mut EffectHandlers) -> Option<Event> {
                 match (s, c) {
                     (State::Running(s), Command::Stop(c)) => {
-                        Self::for_running_stop_stopped(s, c, se).map(|r| r.into())
+                        Self::for_running_stop_stopped(s, c, se).map(|r| Event::Stopped(r))
                     }
                     (State::Idle(s), Command::Start(c)) => {
-                        Self::for_idle_start_started(s, c, se).map(|r| r.into())
+                        Self::for_idle_start_started(s, c, se).map(|r| Event::Started(r))
                     }
                     _ => None,
                 }
@@ -170,10 +146,10 @@ mod tests {
             fn for_event(s: &State, e: &Event) -> Option<State> {
                 match (s, e) {
                     (State::Running(s), Event::Stopped(e)) => {
-                        Self::for_running_stopped_idle(s, e).map(|r| r.into())
+                        Self::for_running_stopped_idle(s, e).map(|r| State::Idle(r))
                     }
                     (State::Idle(s), Event::Started(e)) => {
-                        Self::for_idle_started_running(s, e).map(|r| r.into())
+                        Self::for_idle_started_running(s, e).map(|r| State::Running(r))
                     }
                     _ => None,
                 }

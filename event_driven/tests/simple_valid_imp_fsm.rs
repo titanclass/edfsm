@@ -14,18 +14,6 @@ enum State {
     Running(Running),
 }
 
-impl From<Idle> for State {
-    fn from(s: Idle) -> Self {
-        State::Idle(s)
-    }
-}
-
-impl From<Running> for State {
-    fn from(s: Running) -> Self {
-        State::Running(s)
-    }
-}
-
 struct Start;
 struct Stop;
 
@@ -44,18 +32,6 @@ struct Stopped;
 enum Event {
     Started(Started),
     Stopped(Stopped),
-}
-
-impl From<Started> for Event {
-    fn from(e: Started) -> Self {
-        Event::Started(e)
-    }
-}
-
-impl From<Stopped> for Event {
-    fn from(e: Stopped) -> Self {
-        Event::Stopped(e)
-    }
 }
 
 // Declare an object to handle effects as we step through the FSM
