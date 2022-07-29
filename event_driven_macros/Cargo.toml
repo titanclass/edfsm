@@ -7,7 +7,7 @@ edition = "2021"
 proc-macro = true
 
 [dependencies]
-quote = "1"
 proc-macro2 = "1"
 proc-macro-error = "1"
+quote = "1"
 syn = { version = "1", features = ["full", "extra-traits"] }

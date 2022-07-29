@@ -1,10 +1,9 @@
 use proc_macro::TokenStream;
 
+mod expand;
 mod parse;
 use proc_macro_error::{abort_call_site, proc_macro_error};
-use quote::quote;
-use quote::ToTokens;
-use syn::{parse2, ImplItem};
+use syn::parse2;
 
 #[proc_macro_attribute]
 #[proc_macro_error]
@@ -14,27 +13,10 @@ pub fn impl_fsm(input: TokenStream, annotated_item: TokenStream) -> TokenStream 
     }
 
     match parse2::<parse::Fsm>(annotated_item.into()) {
-        Ok(mut fsm) => {
-            fsm.item_impl.items = vec![
-                parse2::<ImplItem>(quote!(
-                    fn for_command(
-                        s: &State,
-                        c: &Command,
-                        se: &mut EffectHandlers,
-                    ) -> Option<Event> {
-                        todo!()
-                    }
-                ))
-                .unwrap(),
-                parse2::<ImplItem>(quote!(
-                    fn for_event(s: &State, e: &Event) -> Option<State> {
-                        todo!()
-                    }
-                ))
-                .unwrap(),
-            ];
-            fsm.item_impl.to_token_stream().into()
-        }
+        Ok(mut fsm) => match expand::expand(&mut fsm) {
+            Ok(expanded) => expanded.into(),
+            Err(e) => e.to_compile_error().into(),
+        },
         Err(e) => e.to_compile_error().into(),
     }
 }

@@ -2,13 +2,8 @@
 
 use edfsm::{impl_fsm, Fsm};
 
-#[derive(Debug, PartialEq)]
 struct Idle;
-
-#[derive(Debug, PartialEq)]
 struct Running;
-
-#[derive(Debug, PartialEq)]
 enum State {
     Idle(Idle),
     Running(Running),
@@ -16,19 +11,13 @@ enum State {
 
 struct Start;
 struct Stop;
-
 enum Command {
     Start(Start),
     Stop(Stop),
 }
 
-#[derive(Debug, PartialEq)]
 struct Started;
-
-#[derive(Debug, PartialEq)]
 struct Stopped;
-
-#[derive(Debug, PartialEq)]
 enum Event {
     Started(Started),
     Stopped(Stopped),
@@ -39,8 +28,8 @@ enum Event {
 struct EffectHandlers {
     started: u32,
     stopped: u32,
-    transitioned_from_stopped: u32,
-    transitioned_from_started: u32,
+    transitioned_stopped_to_started: u32,
+    transitioned_started_to_stopped: u32,
 }
 
 impl EffectHandlers {
@@ -52,12 +41,12 @@ impl EffectHandlers {
         self.stopped += 1;
     }
 
-    pub fn transitioned_from_started(&mut self) {
-        self.transitioned_from_started += 1;
+    pub fn transitioned_started_to_stopped(&mut self) {
+        self.transitioned_started_to_stopped += 1;
     }
 
-    pub fn transitioned_from_stopped(&mut self) {
-        self.transitioned_from_stopped += 1;
+    pub fn transitioned_stopped_to_started(&mut self) {
+        self.transitioned_stopped_to_started += 1;
     }
 }
 
@@ -105,41 +94,41 @@ fn main() {
     let mut se = EffectHandlers {
         started: 0,
         stopped: 0,
-        transitioned_from_stopped: 0,
-        transitioned_from_started: 0,
+        transitioned_stopped_to_started: 0,
+        transitioned_started_to_stopped: 0,
     };
 
     // Finally, test the FSM by stepping through various states
 
     let (e, t) = MyFsm::step(&State::Idle(Idle), &Command::Start(Start), &mut se);
-    assert_eq!(e, Some(Event::Started(Started)));
-    assert_eq!(t, Some(State::Running(Running)));
+    assert!(matches!(e, Some(Event::Started(Started))));
+    assert!(matches!(t, Some(State::Running(Running))));
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 0);
-    assert_eq!(se.transitioned_from_started, 0);
-    assert_eq!(se.transitioned_from_stopped, 1);
+    assert_eq!(se.transitioned_started_to_stopped, 0);
+    assert_eq!(se.transitioned_stopped_to_started, 1);
 
     let (e, t) = MyFsm::step(&State::Running(Running), &Command::Start(Start), &mut se);
-    assert_eq!(e, None);
-    assert_eq!(t, None);
+    assert!(e.is_none());
+    assert!(t.is_none());
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 0);
-    assert_eq!(se.transitioned_from_started, 0);
-    assert_eq!(se.transitioned_from_stopped, 1);
+    assert_eq!(se.transitioned_started_to_stopped, 0);
+    assert_eq!(se.transitioned_stopped_to_started, 1);
 
     let (e, t) = MyFsm::step(&State::Running(Running), &Command::Stop(Stop), &mut se);
-    assert_eq!(e, Some(Event::Stopped(Stopped)));
-    assert_eq!(t, Some(State::Idle(Idle)));
+    assert!(matches!(e, Some(Event::Stopped(Stopped))));
+    assert!(matches!(t, Some(State::Idle(Idle))));
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 1);
-    assert_eq!(se.transitioned_from_started, 1);
-    assert_eq!(se.transitioned_from_stopped, 1);
+    assert_eq!(se.transitioned_started_to_stopped, 1);
+    assert_eq!(se.transitioned_stopped_to_started, 1);
 
     let (e, t) = MyFsm::step(&&State::Idle(Idle), &Command::Stop(Stop), &mut se);
-    assert_eq!(e, None);
-    assert_eq!(t, None);
+    assert!(e.is_none());
+    assert!(t.is_none());
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 1);
-    assert_eq!(se.transitioned_from_started, 1);
-    assert_eq!(se.transitioned_from_stopped, 1);
+    assert_eq!(se.transitioned_started_to_stopped, 1);
+    assert_eq!(se.transitioned_stopped_to_started, 1);
 }
