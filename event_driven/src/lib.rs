@@ -37,7 +37,7 @@ pub trait Fsm<S, C, E, SE> {
     fn for_event(s: &S, e: &E) -> Option<S>;
 
     /// Optional logic for when transitioning into a new state.
-    fn on_transition(_old_s: &S, _new_s: &S, _c: &C, _e: &E, _se: &mut SE) {}
+    fn on_transition(_old_s: &S, _new_s: &S, _se: &mut SE) {}
 
     /// This is the main entry point to the event driven FSM.
     /// Runs the state machine for a command, optionally performing effects,
@@ -49,7 +49,7 @@ pub trait Fsm<S, C, E, SE> {
         let t = if let Some(e) = &e {
             let t = Self::for_event(s, e);
             if let Some(new_s) = &t {
-                Self::on_transition(s, new_s, c, e, se);
+                Self::on_transition(s, new_s, se);
             };
             t
         } else {
@@ -106,11 +106,11 @@ mod tests {
                 self.stopped += 1;
             }
 
-            pub fn transitioned_started_to_stopped(&mut self) {
+            pub fn from_running(&mut self) {
                 self.transitioned_started_to_stopped += 1;
             }
 
-            pub fn transitioned_stopped_to_started(&mut self) {
+            pub fn to_running(&mut self) {
                 self.transitioned_stopped_to_started += 1;
             }
         }
@@ -147,30 +147,10 @@ mod tests {
             // Let's implement this optional function to show how entry/exit
             // processing can be achieved, and also confirm that our FSM is
             // calling it.
-            fn on_transition(
-                old_s: &State,
-                new_s: &State,
-                c: &Command,
-                e: &Event,
-                se: &mut EffectHandlers,
-            ) {
+            fn on_transition(old_s: &State, new_s: &State, se: &mut EffectHandlers) {
                 match (old_s, new_s) {
-                    (State::Running(_), State::Idle(_)) => match (c, e) {
-                        (Command::Stop(_), Event::Stopped(_)) => {
-                            se.transitioned_started_to_stopped()
-                        }
-                        _ => {
-                            panic!("Unexpected transition");
-                        }
-                    },
-                    (State::Idle(_), State::Running(_)) => match (c, e) {
-                        (Command::Start(_), Event::Started(_)) => {
-                            se.transitioned_stopped_to_started()
-                        }
-                        _ => {
-                            panic!("Unexpected transition");
-                        }
-                    },
+                    (State::Running(s), _) => Self::from_running(s, se),
+                    (_, State::Running(s)) => Self::to_running(s, se),
                     _ => {
                         panic!("Unexpected transition");
                     }
@@ -203,6 +183,14 @@ mod tests {
 
             fn for_idle_started_running(_s: &Idle, _e: &Started) -> Option<Running> {
                 Some(Running)
+            }
+
+            fn from_running(_old_s: &Running, se: &mut EffectHandlers) {
+                se.from_running()
+            }
+
+            fn to_running(_to_s: &Running, se: &mut EffectHandlers) {
+                se.to_running()
             }
         }
 

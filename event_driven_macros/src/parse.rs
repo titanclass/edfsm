@@ -8,8 +8,8 @@ use syn::{
 
 #[derive(Debug, PartialEq)]
 pub struct EntryExit {
-    is_entry: bool,
-    state: Type,
+    pub is_entry: bool,
+    pub state: Type,
 }
 
 impl Parse for EntryExit {

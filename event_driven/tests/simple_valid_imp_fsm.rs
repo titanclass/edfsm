@@ -41,11 +41,11 @@ impl EffectHandlers {
         self.stopped += 1;
     }
 
-    pub fn transitioned_started_to_stopped(&mut self) {
+    pub fn from_running(&mut self) {
         self.transitioned_started_to_stopped += 1;
     }
 
-    pub fn transitioned_stopped_to_started(&mut self) {
+    pub fn to_running(&mut self) {
         self.transitioned_stopped_to_started += 1;
     }
 }
@@ -56,8 +56,8 @@ struct MyFsm {}
 
 #[impl_fsm]
 impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
-    state!(Started / exit);
-    state!(Stopped / exit);
+    state!(Running / entry);
+    state!(Running / exit);
 
     transition!(Idle    => Start => Started => Running);
     transition!(Running => Stop  => Stopped => Idle);
@@ -84,6 +84,14 @@ impl MyFsm {
 
     fn for_idle_started_running(_s: &Idle, _e: &Started) -> Option<Running> {
         Some(Running)
+    }
+
+    fn from_running(_old_s: &Running, se: &mut EffectHandlers) {
+        se.from_running()
+    }
+
+    fn to_running(_to_s: &Running, se: &mut EffectHandlers) {
+        se.to_running()
     }
 }
 
