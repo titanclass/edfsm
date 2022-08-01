@@ -76,7 +76,11 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
     let mut command_matches = Vec::with_capacity(fsm.transitions.len());
     let mut event_matches = Vec::with_capacity(fsm.transitions.len());
     for t in &fsm.transitions {
-        let from_state = ident_from_type(&t.from_state)?;
+        let from_state = if let Type::Infer(_) = t.from_state {
+            None
+        } else {
+            Some(ident_from_type(&t.from_state)?)
+        };
         let command = ident_from_type(&t.command)?;
         let event = ident_from_type(&t.event)?;
         let to_state = if let Some(to_state) = &t.to_state {
@@ -85,31 +89,56 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             None
         };
 
-        let command_handler = format_ident!("for_{}_{}_{}", from_state, command, event);
-        let command_handler = Ident::new(
-            &command_handler.to_string().to_lowercase(),
-            command_handler.span(),
-        );
-        command_matches.push(quote!(
-            (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                Self::#command_handler(s, c, se).map(|r| #event_enum::#event(r))
-            }
-        ));
-
-        let event_handler = if let Some(to_state) = to_state {
-            format_ident!("for_{}_{}_{}", from_state, event, to_state)
+        if let Some(from_state) = from_state {
+            let command_handler =
+                lowercase_ident(&format_ident!("for_{}_{}_{}", from_state, command, event));
+            command_matches.push(quote!(
+                (#state_enum::#from_state(s), #command_enum::#command(c)) => {
+                    Self::#command_handler(s, c, se).map(|r| #event_enum::#event(r))
+                }
+            ));
         } else {
-            format_ident!("for_{}_{}", from_state, event)
+            let command_handler = lowercase_ident(&format_ident!("for_any_{}_{}", command, event));
+            command_matches.push(quote!(
+                (_, #command_enum::#command(c)) => {
+                    Self::#command_handler(c, se).map(|r| #event_enum::#event(r))
+                }
+            ));
+        }
+
+        if let Some(to_state) = to_state {
+            if let Some(from_state) = from_state {
+                let event_handler =
+                    lowercase_ident(&format_ident!("for_{}_{}_{}", from_state, event, to_state));
+                event_matches.push(quote!(
+                    (#state_enum::#from_state(s), #event_enum::#event(e)) => {
+                        Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
+                    }
+                ));
+            } else {
+                let event_handler =
+                    lowercase_ident(&format_ident!("for_any_{}_{}", event, to_state));
+                event_matches.push(quote!(
+                    (_, #event_enum::#event(e)) => {
+                        Self::#event_handler(e).map(|r| #state_enum::#to_state(r))
+                    }
+                ));
+            };
+        } else if let Some(from_state) = from_state {
+            let event_handler = lowercase_ident(&format_ident!("for_{}_{}", from_state, event));
+            event_matches.push(quote!(
+                (#state_enum::#from_state(s), #event_enum::#event(e)) => {
+                    Self::#event_handler(s, e)
+                }
+            ));
+        } else {
+            let event_handler = lowercase_ident(&format_ident!("for_any_{}", event));
+            event_matches.push(quote!(
+                (_, #event_enum::#event(e)) => {
+                    Self::#event_handler(e)
+                }
+            ));
         };
-        let event_handler = Ident::new(
-            &event_handler.to_string().to_lowercase(),
-            event_handler.span(),
-        );
-        event_matches.push(quote!(
-            (#state_enum::#from_state(s), #event_enum::#event(e)) => {
-                Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
-            }
-        ));
     }
     fsm.item_impl.items = vec![
         parse2::<ImplItem>(quote!(
@@ -148,6 +177,10 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         .unwrap(),
     ];
     Ok(fsm.item_impl.to_token_stream())
+}
+
+fn lowercase_ident(ident: &Ident) -> Ident {
+    Ident::new(&ident.to_string().to_lowercase(), ident.span())
 }
 
 fn ident_from_type(from_type: &Type) -> Result<&Ident> {
