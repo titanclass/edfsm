@@ -11,7 +11,9 @@ use syn::{parse2, Error, ImplItem, Result};
 use crate::parse::Fsm;
 
 pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
-    let (state_enum, command_enum, event_enum) = if let Some(trait_) = &fsm.item_impl.trait_ {
+    let (state_enum, command_enum, event_enum, effect_handlers) = if let Some(trait_) =
+        &fsm.item_impl.trait_
+    {
         let trait_path = &trait_.1;
         if let Some(last_trait_segment) = trait_path.segments.last() {
             if last_trait_segment.ident == "Fsm" {
@@ -23,7 +25,8 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                         let state_enum = args_iter.next().unwrap();
                         let command_enum = args_iter.next().unwrap();
                         let event_enum = args_iter.next().unwrap();
-                        (state_enum, command_enum, event_enum)
+                        let effect_handlers = args_iter.next().unwrap();
+                        (state_enum, command_enum, event_enum, effect_handlers)
                     } else {
                         return Err(Error::new_spanned(
                         &fsm_trait_generic_args.args,
@@ -124,29 +127,16 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                     }
                 ));
             };
-        } else if let Some(from_state) = from_state {
-            let event_handler = lowercase_ident(&format_ident!("for_{}_{}", from_state, event));
-            event_matches.push(quote!(
-                (#state_enum::#from_state(s), #event_enum::#event(e)) => {
-                    Self::#event_handler(s, e)
-                }
-            ));
-        } else {
-            let event_handler = lowercase_ident(&format_ident!("for_any_{}", event));
-            event_matches.push(quote!(
-                (_, #event_enum::#event(e)) => {
-                    Self::#event_handler(e)
-                }
-            ));
-        };
+        }
     }
+
     fsm.item_impl.items = vec![
         parse2::<ImplItem>(quote!(
             fn for_command(
-                s: &State,
-                c: &Command,
-                se: &mut EffectHandlers,
-            ) -> Option<Event> {
+                s: &#state_enum,
+                c: &#command_enum,
+                se: &mut #effect_handlers,
+            ) -> Option<#event_enum> {
                 match (s, c) {
                     #( #command_matches )*
                     _ => None,
@@ -156,9 +146,9 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         .unwrap(),
         parse2::<ImplItem>(quote!(
             fn for_event(
-                s: &State,
-                e: &Event,
-            ) -> Option<State> {
+                s: &#state_enum,
+                e: &#event_enum,
+            ) -> Option<#state_enum> {
                 match (s, e) {
                     #( #event_matches )*
                     _ => None,
@@ -167,7 +157,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         ))
         .unwrap(),
         parse2::<ImplItem>(quote!(
-            fn on_transition(old_s: &State, new_s: &State, se: &mut EffectHandlers) {
+            fn on_transition(old_s: &#state_enum, new_s: &#state_enum, se: &mut #effect_handlers) {
                 match (old_s, new_s) {
                     #( #entry_exit_matches )*
                     _ => {}
