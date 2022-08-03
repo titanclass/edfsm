@@ -52,7 +52,7 @@ The `transition!` macro declares an entire transition using the form:
 In our example, for the first transition, multiple methods will be called that the developer must provide e.g.:
 
 ```rust
-fn for_idle_start_started(_s: &Idle, _c: &Start, _se: &mut EffectHandlers) -> Option<Started> {
+fn for_idle_start_started(_s: &Idle, _c: Start, _se: &mut EffectHandlers) -> Option<Started> {
     // Perform some effect here if required. Effects are performed via the EffectHandler
     Some(Started)
 }
