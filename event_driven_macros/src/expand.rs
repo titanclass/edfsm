@@ -57,23 +57,24 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             "Expected the Fsm trait to be implemented.",
         ));
     };
-    let mut entry_exit_matches = Vec::with_capacity(fsm.entry_exit_handlers.len());
+
+    let mut entry_matches = Vec::with_capacity(fsm.entry_exit_handlers.len());
+    let mut exit_matches = Vec::with_capacity(fsm.entry_exit_handlers.len());
     for ee in &fsm.entry_exit_handlers {
         let state = ident_from_type(&ee.state)?;
-        let entry_exit_match = if ee.is_entry {
-            let handler = format_ident!("to_{}", state);
+        if ee.is_entry {
+            let handler = format_ident!("on_entry_{}", state);
             let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
-            quote!(
-                (_, #state_enum::#state(s)) => Self::#handler(s, se),
-            )
+            entry_matches.push(quote!(
+                #state_enum::#state(s) => Self::#handler(s, se),
+            ));
         } else {
-            let handler = format_ident!("from_{}", state);
+            let handler = format_ident!("on_exit_{}", state);
             let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
-            quote!(
-                (#state_enum::#state(s), _) => Self::#handler(s, se),
-            )
+            exit_matches.push(quote!(
+                #state_enum::#state(s) => Self::#handler(s, se),
+            ));
         };
-        entry_exit_matches.push(quote!(#entry_exit_match));
     }
 
     let mut command_matches = Vec::with_capacity(fsm.transitions.len());
@@ -157,9 +158,18 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         ))
         .unwrap(),
         parse2::<ImplItem>(quote!(
-            fn on_transition(old_s: &#state_enum, new_s: &#state_enum, se: &mut #effect_handlers) {
-                match (old_s, new_s) {
-                    #( #entry_exit_matches )*
+            fn on_entry(new_s: &#state_enum, se: &mut #effect_handlers) {
+                match new_s {
+                    #( #entry_matches )*
+                    _ => {}
+                }
+            }
+        ))
+        .unwrap(),
+        parse2::<ImplItem>(quote!(
+            fn on_exit(old_s: &#state_enum, se: &mut #effect_handlers) {
+                match old_s {
+                    #( #exit_matches )*
                     _ => {}
                 }
             }

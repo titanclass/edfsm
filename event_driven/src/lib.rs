@@ -36,8 +36,11 @@ pub trait Fsm<S, C, E, SE> {
     /// events to attain a new state i.e. the major function of event sourcing.
     fn for_event(s: &S, e: &E) -> Option<S>;
 
-    /// Optional logic for when transitioning into a new state.
-    fn on_transition(_old_s: &S, _new_s: &S, _se: &mut SE) {}
+    /// Optional effect on exiting a state.
+    fn on_exit(_s: &S, _se: &mut SE) {}
+
+    /// Optional effect on entering a state.
+    fn on_entry(_s: &S, _se: &mut SE) {}
 
     /// This is the main entry point to the event driven FSM.
     /// Runs the state machine for a command, optionally performing effects,
@@ -49,7 +52,8 @@ pub trait Fsm<S, C, E, SE> {
         let t = if let Some(e) = &e {
             let t = Self::for_event(s, e);
             if let Some(new_s) = &t {
-                Self::on_transition(s, new_s, se);
+                Self::on_exit(s, se);
+                Self::on_entry(new_s, se);
             };
             t
         } else {
@@ -147,13 +151,20 @@ mod tests {
             // Let's implement this optional function to show how entry/exit
             // processing can be achieved, and also confirm that our FSM is
             // calling it.
-            fn on_transition(old_s: &State, new_s: &State, se: &mut EffectHandlers) {
-                match (old_s, new_s) {
-                    (State::Running(s), _) => Self::from_running(s, se),
-                    (_, State::Running(s)) => Self::to_running(s, se),
-                    _ => {
-                        panic!("Unexpected transition");
-                    }
+            fn on_entry(new_s: &State, se: &mut EffectHandlers) {
+                match new_s {
+                    State::Running(s) => Self::on_entry_running(s, se),
+                    _ => (),
+                }
+            }
+
+            // Let's implement this optional function to show how entry/exit
+            // processing can be achieved, and also confirm that our FSM is
+            // calling it.
+            fn on_exit(old_s: &State, se: &mut EffectHandlers) {
+                match old_s {
+                    State::Running(s) => Self::on_exit_running(s, se),
+                    _ => (),
                 }
             }
         }
@@ -185,11 +196,11 @@ mod tests {
                 Some(Running)
             }
 
-            fn from_running(_old_s: &Running, se: &mut EffectHandlers) {
+            fn on_exit_running(_old_s: &Running, se: &mut EffectHandlers) {
                 se.from_running()
             }
 
-            fn to_running(_to_s: &Running, se: &mut EffectHandlers) {
+            fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
                 se.to_running()
             }
         }
