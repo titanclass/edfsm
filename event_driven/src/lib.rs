@@ -29,7 +29,7 @@ pub trait Fsm<S, C, E, SE> {
     /// Given a state and command, optionally emit an event. Can perform side
     /// effects along the way. This function is generally only called from the
     /// `run` function.
-    fn for_command(s: &S, c: &C, se: &mut SE) -> Option<E>;
+    fn for_command(s: &S, c: C, se: &mut SE) -> Option<E>;
 
     /// Given a state and event, produce a transition, which could transition to
     /// the next state. No side effects are to be performed. Can be used to replay
@@ -44,7 +44,7 @@ pub trait Fsm<S, C, E, SE> {
     /// producing an event and transitioning to a new state. Also
     /// applies any "Entry/" or "Exit/" processing when arriving
     /// at a new state.
-    fn step(s: &S, c: &C, se: &mut SE) -> (Option<E>, Option<S>) {
+    fn step(s: &S, c: C, se: &mut SE) -> (Option<E>, Option<S>) {
         let e = Self::for_command(s, c, se);
         let t = if let Some(e) = &e {
             let t = Self::for_event(s, e);
@@ -120,7 +120,7 @@ mod tests {
         struct MyFsm {}
 
         impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
-            fn for_command(s: &State, c: &Command, se: &mut EffectHandlers) -> Option<Event> {
+            fn for_command(s: &State, c: Command, se: &mut EffectHandlers) -> Option<Event> {
                 match (s, c) {
                     (State::Running(s), Command::Stop(c)) => {
                         Self::for_running_stop_stopped(s, c, se).map(|r| Event::Stopped(r))
@@ -161,7 +161,7 @@ mod tests {
         impl MyFsm {
             fn for_running_stop_stopped(
                 _s: &Running,
-                _c: &Stop,
+                _c: Stop,
                 se: &mut EffectHandlers,
             ) -> Option<Stopped> {
                 se.stop_something();
@@ -170,7 +170,7 @@ mod tests {
 
             fn for_idle_start_started(
                 _s: &Idle,
-                _c: &Start,
+                _c: Start,
                 se: &mut EffectHandlers,
             ) -> Option<Started> {
                 se.start_something();
@@ -205,7 +205,7 @@ mod tests {
 
         // Finally, test the FSM by stepping through various states
 
-        let (e, t) = MyFsm::step(&State::Idle(Idle), &Command::Start(Start), &mut se);
+        let (e, t) = MyFsm::step(&State::Idle(Idle), Command::Start(Start), &mut se);
         assert!(matches!(e, Some(Event::Started(Started))));
         assert!(matches!(t, Some(State::Running(Running))));
         assert_eq!(se.started, 1);
@@ -213,7 +213,7 @@ mod tests {
         assert_eq!(se.transitioned_started_to_stopped, 0);
         assert_eq!(se.transitioned_stopped_to_started, 1);
 
-        let (e, t) = MyFsm::step(&State::Running(Running), &Command::Start(Start), &mut se);
+        let (e, t) = MyFsm::step(&State::Running(Running), Command::Start(Start), &mut se);
         assert!(e.is_none());
         assert!(t.is_none());
         assert_eq!(se.started, 1);
@@ -221,7 +221,7 @@ mod tests {
         assert_eq!(se.transitioned_started_to_stopped, 0);
         assert_eq!(se.transitioned_stopped_to_started, 1);
 
-        let (e, t) = MyFsm::step(&State::Running(Running), &Command::Stop(Stop), &mut se);
+        let (e, t) = MyFsm::step(&State::Running(Running), Command::Stop(Stop), &mut se);
         assert!(matches!(e, Some(Event::Stopped(Stopped))));
         assert!(matches!(t, Some(State::Idle(Idle))));
         assert_eq!(se.started, 1);
@@ -229,7 +229,7 @@ mod tests {
         assert_eq!(se.transitioned_started_to_stopped, 1);
         assert_eq!(se.transitioned_stopped_to_started, 1);
 
-        let (e, t) = MyFsm::step(&&State::Idle(Idle), &Command::Stop(Stop), &mut se);
+        let (e, t) = MyFsm::step(&&State::Idle(Idle), Command::Stop(Stop), &mut se);
         assert!(e.is_none());
         assert!(t.is_none());
         assert_eq!(se.started, 1);

@@ -66,14 +66,14 @@ impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
 impl MyFsm {
     fn for_running_stop_stopped(
         _s: &Running,
-        _c: &Stop,
+        _c: Stop,
         se: &mut EffectHandlers,
     ) -> Option<Stopped> {
         se.stop_something();
         Some(Stopped)
     }
 
-    fn for_idle_start_started(_s: &Idle, _c: &Start, se: &mut EffectHandlers) -> Option<Started> {
+    fn for_idle_start_started(_s: &Idle, _c: Start, se: &mut EffectHandlers) -> Option<Started> {
         se.start_something();
         Some(Started)
     }
@@ -108,7 +108,7 @@ fn main() {
 
     // Finally, test the FSM by stepping through various states
 
-    let (e, t) = MyFsm::step(&State::Idle(Idle), &Command::Start(Start), &mut se);
+    let (e, t) = MyFsm::step(&State::Idle(Idle), Command::Start(Start), &mut se);
     assert!(matches!(e, Some(Event::Started(Started))));
     assert!(matches!(t, Some(State::Running(Running))));
     assert_eq!(se.started, 1);
@@ -116,7 +116,7 @@ fn main() {
     assert_eq!(se.transitioned_started_to_stopped, 0);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
-    let (e, t) = MyFsm::step(&State::Running(Running), &Command::Start(Start), &mut se);
+    let (e, t) = MyFsm::step(&State::Running(Running), Command::Start(Start), &mut se);
     assert!(e.is_none());
     assert!(t.is_none());
     assert_eq!(se.started, 1);
@@ -124,7 +124,7 @@ fn main() {
     assert_eq!(se.transitioned_started_to_stopped, 0);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
-    let (e, t) = MyFsm::step(&State::Running(Running), &Command::Stop(Stop), &mut se);
+    let (e, t) = MyFsm::step(&State::Running(Running), Command::Stop(Stop), &mut se);
     assert!(matches!(e, Some(Event::Stopped(Stopped))));
     assert!(matches!(t, Some(State::Idle(Idle))));
     assert_eq!(se.started, 1);
@@ -132,7 +132,7 @@ fn main() {
     assert_eq!(se.transitioned_started_to_stopped, 1);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
-    let (e, t) = MyFsm::step(&&State::Idle(Idle), &Command::Stop(Stop), &mut se);
+    let (e, t) = MyFsm::step(&&State::Idle(Idle), Command::Stop(Stop), &mut se);
     assert!(e.is_none());
     assert!(t.is_none());
     assert_eq!(se.started, 1);

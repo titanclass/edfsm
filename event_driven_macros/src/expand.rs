@@ -134,7 +134,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         parse2::<ImplItem>(quote!(
             fn for_command(
                 s: &#state_enum,
-                c: &#command_enum,
+                c: #command_enum,
                 se: &mut #effect_handlers,
             ) -> Option<#event_enum> {
                 match (s, c) {
