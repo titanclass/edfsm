@@ -86,11 +86,11 @@ impl MyFsm {
         Some(Running)
     }
 
-    fn from_running(_old_s: &Running, se: &mut EffectHandlers) {
+    fn on_exit_running(_old_s: &Running, se: &mut EffectHandlers) {
         se.from_running()
     }
 
-    fn to_running(_to_s: &Running, se: &mut EffectHandlers) {
+    fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
         se.to_running()
     }
 }

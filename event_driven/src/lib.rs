@@ -153,7 +153,7 @@ mod tests {
             // calling it.
             fn on_entry(new_s: &State, se: &mut EffectHandlers) {
                 match new_s {
-                    State::Running(s) => Self::to_running(s, se),
+                    State::Running(s) => Self::on_entry_running(s, se),
                     _ => (),
                 }
             }
@@ -163,7 +163,7 @@ mod tests {
             // calling it.
             fn on_exit(old_s: &State, se: &mut EffectHandlers) {
                 match old_s {
-                    State::Running(s) => Self::from_running(s, se),
+                    State::Running(s) => Self::on_exit_running(s, se),
                     _ => (),
                 }
             }
@@ -196,11 +196,11 @@ mod tests {
                 Some(Running)
             }
 
-            fn from_running(_old_s: &Running, se: &mut EffectHandlers) {
+            fn on_exit_running(_old_s: &Running, se: &mut EffectHandlers) {
                 se.from_running()
             }
 
-            fn to_running(_to_s: &Running, se: &mut EffectHandlers) {
+            fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
                 se.to_running()
             }
         }

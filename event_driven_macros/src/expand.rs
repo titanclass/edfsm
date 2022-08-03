@@ -63,13 +63,13 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
     for ee in &fsm.entry_exit_handlers {
         let state = ident_from_type(&ee.state)?;
         if ee.is_entry {
-            let handler = format_ident!("to_{}", state);
+            let handler = format_ident!("on_entry_{}", state);
             let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
             entry_matches.push(quote!(
                 #state_enum::#state(s) => Self::#handler(s, se),
             ));
         } else {
-            let handler = format_ident!("from_{}", state);
+            let handler = format_ident!("on_exit_{}", state);
             let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
             exit_matches.push(quote!(
                 #state_enum::#state(s) => Self::#handler(s, se),
