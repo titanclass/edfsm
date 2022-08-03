@@ -33,12 +33,12 @@ impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
 ```
 
 The `state!` macro declares state-related attributes. At this time, entry and exit
-handlers can be declared. In our example, the macro will ensure that a `to_running`
-and a `from_running` method will be called for `MyFsm`. The developer is then
+handlers can be declared. In our example, the macro will ensure that an `on_entry_running`
+and an `on_exit_running` method will be called for `MyFsm`. The developer is then
 required to implement these methods e.g.:
 
 ```rust
-fn from_running(_old_s: &Running, _se: &mut EffectHandlers) {
+fn on_exit_running(_old_s: &Running, _se: &mut EffectHandlers) {
     // Do something
 }
 ```
