@@ -86,7 +86,11 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             Some(ident_from_type(&t.from_state)?)
         };
         let command = ident_from_type(&t.command)?;
-        let event = ident_from_type(&t.event)?;
+        let event = if let Some(event) = &t.event {
+            Some(ident_from_type(event)?)
+        } else {
+            None
+        };
         let to_state = if let Some(to_state) = &t.to_state {
             Some(ident_from_type(to_state)?)
         } else {
@@ -94,32 +98,56 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         };
 
         if let Some(from_state) = from_state {
-            let command_handler =
-                lowercase_ident(&format_ident!("for_{}_{}_{}", from_state, command, event));
-            command_matches.push(quote!(
-                (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                    Self::#command_handler(s, c, se).map(|r| #event_enum::#event(r))
-                }
-            ));
-        } else {
+            if let Some(event) = event {
+                let command_handler =
+                    lowercase_ident(&format_ident!("for_{}_{}_{}", from_state, command, event));
+                command_matches.push(quote!(
+                    (#state_enum::#from_state(s), #command_enum::#command(c)) => {
+                        Self::#command_handler(s, c, se).map(|r| #event_enum::#event(r))
+                    }
+                ));
+            } else {
+                let command_handler =
+                    lowercase_ident(&format_ident!("for_{}_{}", from_state, command));
+                command_matches.push(quote!(
+                    (#state_enum::#from_state(s), #command_enum::#command(c)) => {
+                        Self::#command_handler(s, c, se)
+                    }
+                ));
+            }
+        } else if let Some(event) = event {
             let command_handler = lowercase_ident(&format_ident!("for_any_{}_{}", command, event));
             command_matches.push(quote!(
                 (_, #command_enum::#command(c)) => {
                     Self::#command_handler(c, se).map(|r| #event_enum::#event(r))
                 }
             ));
+        } else {
+            let command_handler = lowercase_ident(&format_ident!("for_any_{}", command));
+            command_matches.push(quote!(
+                (_, #command_enum::#command(c)) => {
+                    Self::#command_handler(c, se)
+                }
+            ));
         }
 
         if let Some(to_state) = to_state {
             if let Some(from_state) = from_state {
-                let event_handler =
-                    lowercase_ident(&format_ident!("for_{}_{}_{}", from_state, event, to_state));
-                event_matches.push(quote!(
-                    (#state_enum::#from_state(s), #event_enum::#event(e)) => {
-                        Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
-                    }
-                ));
+                if let Some(event) = event {
+                    let event_handler = lowercase_ident(&format_ident!(
+                        "for_{}_{}_{}",
+                        from_state,
+                        event,
+                        to_state
+                    ));
+                    event_matches.push(quote!(
+                        (#state_enum::#from_state(s), #event_enum::#event(e)) => {
+                            Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
+                        }
+                    ));
+                }
             } else {
+                let event = event.unwrap(); // Logic error if no event given a to_state.
                 let event_handler =
                     lowercase_ident(&format_ident!("for_any_{}_{}", event, to_state));
                 event_matches.push(quote!(
