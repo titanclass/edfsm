@@ -33,7 +33,7 @@ impl Parse for EntryExit {
 pub struct Transition {
     pub from_state: Type,
     pub command: Type,
-    pub event: Type,
+    pub event: Option<Type>,
     pub to_state: Option<Type>,
 }
 
@@ -42,12 +42,16 @@ impl Parse for Transition {
         let from_state = input.parse()?;
         input.parse::<Token![=>]>()?;
         let command = input.parse()?;
-        input.parse::<Token![=>]>()?;
-        let event = input.parse()?;
-        let to_state = if input.parse::<Token![=>]>().is_ok() {
-            Some(input.parse()?)
+        let (event, to_state) = if input.parse::<Token![=>]>().is_ok() {
+            let event = Some(input.parse()?);
+            let to_state = if input.parse::<Token![=>]>().is_ok() {
+                Some(input.parse()?)
+            } else {
+                None
+            };
+            (event, to_state)
         } else {
-            None
+            (None, None)
         };
         Ok(Self {
             from_state,
@@ -121,7 +125,7 @@ mod tests {
                 transition!(Uninitialised  => GenerateRootKey => RootKeyGenerated => SsInitialised);
                 transition!(SsInitialised  => GenerateVpnKey  => VpnKeyGenerated  => VpnInitialised);
                 transition!(VpnInitialised => SetCredentials  => CredentialsSet   => Configurable);
-                transition!(_              => GetUsername     => UsernameRetrieved);
+                transition!(_              => GetUsername);
                 transition!(_              => Reset           => FactoryReset     => Uninitialised);
                 transition!(_              => Reset           => SoftReset        => VpnInitialised);
             }
@@ -147,7 +151,7 @@ mod tests {
                     quote!(VpnInitialised => SetCredentials  => CredentialsSet   => Configurable)
                 )
                 .unwrap(),
-                parse2(quote!(_              => GetUsername     => UsernameRetrieved)).unwrap(),
+                parse2(quote!(_              => GetUsername)).unwrap(),
                 parse2(
                     quote!(_              => Reset           => FactoryReset     => Uninitialised)
                 )
