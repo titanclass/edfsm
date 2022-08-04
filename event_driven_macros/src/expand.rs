@@ -111,7 +111,8 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                     lowercase_ident(&format_ident!("for_{}_{}", from_state, command));
                 command_matches.push(quote!(
                     (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se)
+                        Self::#command_handler(s, c, se);
+                        None
                     }
                 ));
             }
@@ -119,14 +120,15 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             let command_handler = lowercase_ident(&format_ident!("for_any_{}_{}", command, event));
             command_matches.push(quote!(
                 (_, #command_enum::#command(c)) => {
-                    Self::#command_handler(c, se).map(|r| #event_enum::#event(r))
+                    Self::#command_handler(s, c, se).map(|r| #event_enum::#event(r))
                 }
             ));
         } else {
             let command_handler = lowercase_ident(&format_ident!("for_any_{}", command));
             command_matches.push(quote!(
                 (_, #command_enum::#command(c)) => {
-                    Self::#command_handler(c, se)
+                    Self::#command_handler(s, c, se);
+                    None
                 }
             ));
         }
@@ -152,7 +154,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                     lowercase_ident(&format_ident!("for_any_{}_{}", event, to_state));
                 event_matches.push(quote!(
                     (_, #event_enum::#event(e)) => {
-                        Self::#event_handler(e).map(|r| #state_enum::#to_state(r))
+                        Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
                     }
                 ));
             };
