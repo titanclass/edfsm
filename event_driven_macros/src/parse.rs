@@ -6,7 +6,7 @@ use syn::{
     parse2, Error, Ident, ImplItem, ImplItemMacro, ItemImpl, Result, Token, Type,
 };
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct EntryExit {
     pub is_entry: bool,
     pub state: Type,
@@ -29,7 +29,7 @@ impl Parse for EntryExit {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Transition {
     pub from_state: Type,
     pub command: Type,
