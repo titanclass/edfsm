@@ -94,7 +94,7 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(O1)
     }
 
-    fn for_any_o1(_s: &State, _e: &O1) -> Option<A> {
+    fn on_any_o1(_s: &State, _e: &O1) -> Option<A> {
         Some(A)
     }
 

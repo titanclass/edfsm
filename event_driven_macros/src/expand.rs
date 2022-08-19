@@ -144,7 +144,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                 }
             } else {
                 let event = event.unwrap(); // Logic error if no event given a to_state.
-                let event_handler = lowercase_ident(&format_ident!("for_any_{}", event));
+                let event_handler = lowercase_ident(&format_ident!("on_any_{}", event));
                 event_matches.push(quote!(
                     (_, #event_enum::#event(e)) => {
                         Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
