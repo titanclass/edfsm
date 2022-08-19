@@ -63,46 +63,46 @@ impl<SE: EffectHandlers> Fsm<State, Input, Output, EffectHandlerBox<SE>> for MyF
 }
 
 impl<SE: EffectHandlers> MyFsm<SE> {
-    fn for_a_i0_o0(_s: &A, _c: I0, se: &mut EffectHandlerBox<SE>) -> Option<O0> {
+    fn for_a_i0(_s: &A, _c: I0, se: &mut EffectHandlerBox<SE>) -> Option<O0> {
         se.0.say_hi();
         Some(O0)
     }
 
-    fn for_a_o0_b(_s: &A, _e: &O0) -> Option<B> {
+    fn on_a_o0(_s: &A, _e: &O0) -> Option<B> {
         Some(B)
     }
 
-    fn for_b_i1_o1(_s: &B, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
+    fn on_entry_b(_to_s: &B, _se: &mut EffectHandlerBox<SE>) {}
+
+    fn for_b_i1(_s: &B, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
         Some(O1)
     }
 
-    fn for_b_o1_a(_s: &B, _e: &O1) -> Option<A> {
+    fn on_b_o1(_s: &B, _e: &O1) -> Option<A> {
         Some(A)
     }
 
-    fn for_b_i2_o2(_s: &B, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
+    fn for_b_i2(_s: &B, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
         Some(O2)
     }
 
     fn for_b_i3(_s: &B, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
 
-    fn for_any_i1_o1(_s: &State, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
+    fn on_exit_b(_old_s: &B, _se: &mut EffectHandlerBox<SE>) {}
+
+    fn for_any_i1(_s: &State, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
         Some(O1)
     }
 
-    fn for_any_o1_a(_s: &State, _e: &O1) -> Option<A> {
+    fn for_any_o1(_s: &State, _e: &O1) -> Option<A> {
         Some(A)
     }
 
-    fn for_any_i2_o2(_s: &State, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
+    fn for_any_i2(_s: &State, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
         Some(O2)
     }
 
     fn for_any_i3(_s: &State, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
-
-    fn on_entry_b(_to_s: &B, _se: &mut EffectHandlerBox<SE>) {}
-
-    fn on_exit_b(_old_s: &B, _se: &mut EffectHandlerBox<SE>) {}
 }
 
 #[test]

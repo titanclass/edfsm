@@ -34,7 +34,7 @@ pub trait Fsm<S, C, E, SE> {
     /// Given a state and event, produce a transition, which could transition to
     /// the next state. No side effects are to be performed. Can be used to replay
     /// events to attain a new state i.e. the major function of event sourcing.
-    fn for_event(s: &S, e: &E) -> Option<S>;
+    fn on_event(s: &S, e: &E) -> Option<S>;
 
     /// Optional effect on exiting a state.
     fn on_exit(_s: &S, _se: &mut SE) {}
@@ -50,7 +50,7 @@ pub trait Fsm<S, C, E, SE> {
     fn step(s: &S, c: C, se: &mut SE) -> (Option<E>, Option<S>) {
         let e = Self::for_command(s, c, se);
         let t = if let Some(e) = &e {
-            let t = Self::for_event(s, e);
+            let t = Self::on_event(s, e);
             if let Some(new_s) = &t {
                 Self::on_exit(s, se);
                 Self::on_entry(new_s, se);
@@ -127,22 +127,22 @@ mod tests {
             fn for_command(s: &State, c: Command, se: &mut EffectHandlers) -> Option<Event> {
                 match (s, c) {
                     (State::Running(s), Command::Stop(c)) => {
-                        Self::for_running_stop_stopped(s, c, se).map(|r| Event::Stopped(r))
+                        Self::for_running_stop(s, c, se).map(|r| Event::Stopped(r))
                     }
                     (State::Idle(s), Command::Start(c)) => {
-                        Self::for_idle_start_started(s, c, se).map(|r| Event::Started(r))
+                        Self::for_idle_start(s, c, se).map(|r| Event::Started(r))
                     }
                     _ => None,
                 }
             }
 
-            fn for_event(s: &State, e: &Event) -> Option<State> {
+            fn on_event(s: &State, e: &Event) -> Option<State> {
                 match (s, e) {
                     (State::Running(s), Event::Stopped(e)) => {
-                        Self::for_running_stopped_idle(s, e).map(|r| State::Idle(r))
+                        Self::on_running_stopped(s, e).map(|r| State::Idle(r))
                     }
                     (State::Idle(s), Event::Started(e)) => {
-                        Self::for_idle_started_running(s, e).map(|r| State::Running(r))
+                        Self::on_idle_started(s, e).map(|r| State::Running(r))
                     }
                     _ => None,
                 }
@@ -170,7 +170,11 @@ mod tests {
         }
 
         impl MyFsm {
-            fn for_running_stop_stopped(
+            fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
+                se.to_running()
+            }
+
+            fn for_running_stop(
                 _s: &Running,
                 _c: Stop,
                 se: &mut EffectHandlers,
@@ -179,29 +183,21 @@ mod tests {
                 Some(Stopped)
             }
 
-            fn for_idle_start_started(
-                _s: &Idle,
-                _c: Start,
-                se: &mut EffectHandlers,
-            ) -> Option<Started> {
-                se.start_something();
-                Some(Started)
-            }
-
-            fn for_running_stopped_idle(_s: &Running, _e: &Stopped) -> Option<Idle> {
-                Some(Idle)
-            }
-
-            fn for_idle_started_running(_s: &Idle, _e: &Started) -> Option<Running> {
-                Some(Running)
-            }
-
             fn on_exit_running(_old_s: &Running, se: &mut EffectHandlers) {
                 se.from_running()
             }
 
-            fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
-                se.to_running()
+            fn on_running_stopped(_s: &Running, _e: &Stopped) -> Option<Idle> {
+                Some(Idle)
+            }
+
+            fn for_idle_start(_s: &Idle, _c: Start, se: &mut EffectHandlers) -> Option<Started> {
+                se.start_something();
+                Some(Started)
+            }
+
+            fn on_idle_started(_s: &Idle, _e: &Started) -> Option<Running> {
+                Some(Running)
             }
         }
 
