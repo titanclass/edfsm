@@ -91,10 +91,14 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         } else {
             None
         };
-        let to_state = if let Some(to_state) = &t.to_state {
-            Some(ident_from_type(to_state)?)
+        let (to_state, to_state_explicit) = if let Some(to_state) = &t.to_state {
+            match to_state.states.as_slice() {
+                [single_type] => (Some(ident_from_type(single_type)?), true),
+                [first_type, ..] => (Some(ident_from_type(first_type)?), false),
+                _ => panic!("There must be at least one element"),
+            }
         } else {
-            None
+            (None, false)
         };
 
         if let Some(from_state) = from_state {
@@ -136,20 +140,36 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                 if let Some(event) = event {
                     let event_handler =
                         lowercase_ident(&format_ident!("on_{}_{}", from_state, event));
-                    event_matches.push(quote!(
-                        (#state_enum::#from_state(s), #event_enum::#event(e)) => {
-                            Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
-                        }
-                    ));
+                    if to_state_explicit {
+                        event_matches.push(quote!(
+                            (#state_enum::#from_state(s), #event_enum::#event(e)) => {
+                                Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
+                            }
+                        ));
+                    } else {
+                        event_matches.push(quote!(
+                            (#state_enum::#from_state(s), #event_enum::#event(e)) => {
+                                Self::#event_handler(s, e)
+                            }
+                        ));
+                    }
                 }
             } else {
                 let event = event.unwrap(); // Logic error if no event given a to_state.
                 let event_handler = lowercase_ident(&format_ident!("on_any_{}", event));
-                event_matches.push(quote!(
-                    (_, #event_enum::#event(e)) => {
-                        Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
-                    }
-                ));
+                if to_state_explicit {
+                    event_matches.push(quote!(
+                        (_, #event_enum::#event(e)) => {
+                            Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
+                        }
+                    ));
+                } else {
+                    event_matches.push(quote!(
+                        (_, #event_enum::#event(e)) => {
+                            Self::#event_handler(s, e)
+                        }
+                    ));
+                }
             };
         }
     }
