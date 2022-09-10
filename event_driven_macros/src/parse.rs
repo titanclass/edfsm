@@ -30,11 +30,32 @@ impl Parse for EntryExit {
 }
 
 #[derive(Debug, Eq, PartialEq)]
+pub struct TargetStates {
+    pub states: Vec<Type>,
+}
+
+impl Parse for TargetStates {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let mut target_types = vec![];
+        loop {
+            let target_type = input.parse()?;
+            target_types.push(target_type);
+            if input.parse::<Token![|]>().is_err() {
+                break;
+            }
+        }
+        Ok(Self {
+            states: target_types,
+        })
+    }
+}
+
+#[derive(Debug, Eq, PartialEq)]
 pub struct Transition {
     pub from_state: Type,
     pub command: Type,
     pub event: Option<Type>,
-    pub to_state: Option<Type>,
+    pub to_state: Option<TargetStates>,
 }
 
 impl Parse for Transition {
@@ -161,6 +182,21 @@ mod tests {
                 )
                 .unwrap(),
             ]
+        );
+    }
+
+    #[test]
+    fn test_multi_targets() {
+        let fsm = parse2::<Fsm>(quote!(
+            impl Fsm<State, Command, Event, EffectHandlers> for SomeFsm {
+                transition!(S0  => C => E => S0 | S1);
+            }
+        ))
+        .unwrap();
+
+        assert_eq!(
+            fsm.transitions[0].to_state.as_ref().unwrap().states.len(),
+            2
         );
     }
 }

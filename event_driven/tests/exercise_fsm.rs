@@ -53,7 +53,7 @@ impl<SE: EffectHandlers> Fsm<State, Input, Output, EffectHandlerBox<SE>> for MyF
     state!(B / exit);
 
     transition!(A => I0 => O0 => B);
-    transition!(B => I1 => O1 => A);
+    transition!(B => I1 => O1 => A | B);
     transition!(B => I2 => O2);
     transition!(B => I3);
 
@@ -78,8 +78,8 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(O1)
     }
 
-    fn on_b_o1(_s: &B, _e: &O1) -> Option<A> {
-        Some(A)
+    fn on_b_o1(_s: &B, _e: &O1) -> Option<State> {
+        Some(State::A(A))
     }
 
     fn for_b_i2(_s: &B, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
