@@ -7,6 +7,8 @@
 
 #![no_std]
 
+use core::mem;
+
 pub use event_driven_macros::impl_fsm;
 
 /// Describes the behavior of a Finite State Machine (FSM) that can receive commands and produce
@@ -52,8 +54,10 @@ pub trait Fsm<S, C, E, SE> {
         let t = if let Some(e) = &e {
             let t = Self::on_event(s, e);
             if let Some(new_s) = &t {
-                Self::on_exit(s, se);
-                Self::on_entry(new_s, se);
+                if mem::discriminant(new_s) != mem::discriminant(s) {
+                    Self::on_exit(s, se);
+                    Self::on_entry(new_s, se);
+                }
             };
             t
         } else {
