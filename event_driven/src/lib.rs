@@ -44,6 +44,15 @@ pub trait Fsm<S, C, E, SE> {
     /// Optional effect on entering a state.
     fn on_entry(_s: &S, _se: &mut SE) {}
 
+    /// Determines whether an actual state transition is to occur given two states, 'S'.
+    /// By default, [mem::discriminant] is used to compare an old state's and a new state's
+    /// variants on the assumption that `S` represents an enum.
+    /// [mem::discriminant]'s use where `S` is not an enum is undefined, which would
+    /// therefore warrant an override of this function.
+    fn is_transitioning(s0: &S, s1: &S) -> bool {
+        mem::discriminant(s0) != mem::discriminant(s1)
+    }
+
     /// This is the main entry point to the event driven FSM.
     /// Runs the state machine for a command, optionally performing effects,
     /// producing an event and transitioning to a new state. Also
@@ -54,7 +63,7 @@ pub trait Fsm<S, C, E, SE> {
         let t = if let Some(e) = &e {
             let t = Self::on_event(s, e);
             if let Some(new_s) = &t {
-                if mem::discriminant(new_s) != mem::discriminant(s) {
+                if Self::is_transitioning(s, new_s) {
                     Self::on_exit(s, se);
                     Self::on_entry(new_s, se);
                 }
