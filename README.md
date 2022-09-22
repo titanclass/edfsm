@@ -46,7 +46,7 @@ fn on_exit_running(_old_s: &Running, _se: &mut EffectHandlers) {
 The `transition!` macro declares an entire transition using the form:
 
 ```
-<from-state> => <given-command> => <yields-event> => <to-state>
+<from-state> => <given-command> [=> <yields-event> []=> <to-state>]]
 ```
 
 In our example, for the first transition, multiple methods will be called that the developer must provide e.g.:

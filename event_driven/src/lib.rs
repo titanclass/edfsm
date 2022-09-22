@@ -36,11 +36,16 @@ pub trait Fsm<S, C, E, SE> {
     /// events to attain a new state i.e. the major function of event sourcing.
     fn on_event(s: &S, e: &E) -> Option<S>;
 
-    /// Optional effect on exiting a state.
+    /// Optional effect on exiting a state i.e. transitioning out of state `S` into
+    /// another.
     fn on_exit(_s: &S, _se: &mut SE) {}
 
-    /// Optional effect on entering a state.
+    /// Optional effect on entering a state i.e. transitioning in to state `S` from
+    /// another.
     fn on_entry(_s: &S, _se: &mut SE) {}
+
+    /// Determines whether an actual state transition is to occur given two states, 'S'.
+    fn is_transitioning(s0: &S, s1: &S) -> bool;
 
     /// This is the main entry point to the event driven FSM.
     /// Runs the state machine for a command, optionally performing effects,
@@ -52,8 +57,10 @@ pub trait Fsm<S, C, E, SE> {
         let t = if let Some(e) = &e {
             let t = Self::on_event(s, e);
             if let Some(new_s) = &t {
-                Self::on_exit(s, se);
-                Self::on_entry(new_s, se);
+                if Self::is_transitioning(s, new_s) {
+                    Self::on_exit(s, se);
+                    Self::on_entry(new_s, se);
+                }
             };
             t
         } else {
@@ -166,6 +173,14 @@ mod tests {
                     State::Running(s) => Self::on_exit_running(s, se),
                     _ => (),
                 }
+            }
+
+            // [mem::discriminant] is used to compare an old state's and a new state's
+            // variants given that `State` represents an enum.
+            // [mem::discriminant]'s use where `State` is not an enum is undefined, which would
+            // therefore warrant a different implementation of this function.
+            fn is_transitioning(s0: &State, s1: &State) -> bool {
+                core::mem::discriminant(s0) != core::mem::discriminant(s1)
             }
         }
 
