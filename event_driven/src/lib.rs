@@ -7,8 +7,6 @@
 
 #![no_std]
 
-use core::mem;
-
 pub use event_driven_macros::impl_fsm;
 
 /// Describes the behavior of a Finite State Machine (FSM) that can receive commands and produce
@@ -38,20 +36,16 @@ pub trait Fsm<S, C, E, SE> {
     /// events to attain a new state i.e. the major function of event sourcing.
     fn on_event(s: &S, e: &E) -> Option<S>;
 
-    /// Optional effect on exiting a state.
+    /// Optional effect on exiting a state i.e. transitioning out of state `S` into
+    /// another.
     fn on_exit(_s: &S, _se: &mut SE) {}
 
-    /// Optional effect on entering a state.
+    /// Optional effect on entering a state i.e. transitioning in to state `S` from
+    /// another.
     fn on_entry(_s: &S, _se: &mut SE) {}
 
     /// Determines whether an actual state transition is to occur given two states, 'S'.
-    /// By default, [mem::discriminant] is used to compare an old state's and a new state's
-    /// variants on the assumption that `S` represents an enum.
-    /// [mem::discriminant]'s use where `S` is not an enum is undefined, which would
-    /// therefore warrant an override of this function.
-    fn is_transitioning(s0: &S, s1: &S) -> bool {
-        mem::discriminant(s0) != mem::discriminant(s1)
-    }
+    fn is_transitioning(s0: &S, s1: &S) -> bool;
 
     /// This is the main entry point to the event driven FSM.
     /// Runs the state machine for a command, optionally performing effects,
@@ -179,6 +173,14 @@ mod tests {
                     State::Running(s) => Self::on_exit_running(s, se),
                     _ => (),
                 }
+            }
+
+            // [mem::discriminant] is used to compare an old state's and a new state's
+            // variants given that `State` represents an enum.
+            // [mem::discriminant]'s use where `State` is not an enum is undefined, which would
+            // therefore warrant a different implementation of this function.
+            fn is_transitioning(s0: &State, s1: &State) -> bool {
+                core::mem::discriminant(s0) != core::mem::discriminant(s1)
             }
         }
 

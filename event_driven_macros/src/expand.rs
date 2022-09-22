@@ -218,6 +218,12 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             }
         ))
         .unwrap(),
+        parse2::<ImplItem>(quote!(
+            fn is_transitioning(s0: &#state_enum, s1: &#state_enum) -> bool {
+                core::mem::discriminant(s0) != core::mem::discriminant(s1)
+            }
+        ))
+        .unwrap(),
     ];
     Ok(fsm.item_impl.to_token_stream())
 }
