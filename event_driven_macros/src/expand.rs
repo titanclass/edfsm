@@ -171,6 +171,16 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                     ));
                 }
             };
+        } else if from_state.is_none() {
+            // from and to states are None
+            if let Some(event) = event {
+                let event_handler = lowercase_ident(&format_ident!("on_any_{}", event));
+                event_matches.push(quote!(
+                    (_, #event_enum::#event(e)) => {
+                        Self::#event_handler(s, e)
+                    }
+                ));
+            }
         }
     }
 
