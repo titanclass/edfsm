@@ -102,6 +102,10 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(O2)
     }
 
+    fn on_any_o2(_s: &State, _e: &O2) -> Option<State> {
+        Some(State::A(A))
+    }
+
     fn for_any_i3(_s: &State, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
 }
 
