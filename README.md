@@ -29,6 +29,9 @@ impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
 
     transition!(Idle    => Start => Started => Running);
     transition!(Running => Stop  => Stopped => Idle);
+
+    ignore!(Idle    => Stop);
+    ignore!(Running => Start);
 }
 ```
 
@@ -61,6 +64,14 @@ fn on_idle_started(_s: &Idle, _e: &Started) -> Option<Running> {
     Some(Running)
 }
 ```
+
+The `ignore!` macro describes those states and commands that should be ignored given:
+
+```
+<from-state> => <given-command>
+```
+
+It is possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
 
 Please see the event_driven/tests folder for complete examples.
 

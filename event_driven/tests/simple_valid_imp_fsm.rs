@@ -61,6 +61,9 @@ impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
 
     transition!(Idle    => Start => Started => Running);
     transition!(Running => Stop  => Stopped => Idle);
+
+    ignore!(Idle    => Stop);
+    ignore!(Running => Start);
 }
 
 impl MyFsm {

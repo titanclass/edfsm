@@ -19,6 +19,9 @@ use syn::parse2;
 ///
 ///     transition!(Idle    => Start => Started => Running);
 ///     transition!(Running => Stop  => Stopped => Idle);
+///
+///     ignore!(Idle    => Stop);
+///     ignore!(Running => Start);
 /// }
 /// ```
 ///
@@ -51,6 +54,14 @@ use syn::parse2;
 ///     Some(Running)
 /// }
 /// ```
+///
+/// The `ignore!` macro describes those states and commands that should be ignored given:
+///
+/// ```compile_fail
+/// <from-state> => <given-command>
+/// ```
+///
+/// It is possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn impl_fsm(input: TokenStream, annotated_item: TokenStream) -> TokenStream {

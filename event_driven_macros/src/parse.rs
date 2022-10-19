@@ -83,10 +83,29 @@ impl Parse for Transition {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct Ignore {
+    pub from_state: Type,
+    pub command: Type,
+}
+
+impl Parse for Ignore {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let from_state = input.parse()?;
+        input.parse::<Token![=>]>()?;
+        let command = input.parse()?;
+        Ok(Self {
+            from_state,
+            command,
+        })
+    }
+}
+
 #[derive(Debug)]
 pub struct Fsm {
     pub entry_exit_handlers: Vec<EntryExit>,
     pub transitions: Vec<Transition>,
+    pub ignores: Vec<Ignore>,
     pub item_impl: ItemImpl,
 }
 
@@ -98,6 +117,7 @@ impl Parse for Fsm {
 
         let mut entry_exit_handlers = vec![];
         let mut transitions = vec![];
+        let mut ignores = vec![];
 
         for item in items {
             if let ImplItem::Macro(ImplItemMacro { mac, .. }) = item {
@@ -110,14 +130,17 @@ impl Parse for Fsm {
                     "transition" => {
                         transitions.push(parse2::<Transition>(mac.tokens)?);
                     }
+                    "ignore" => {
+                        ignores.push(parse2::<Ignore>(mac.tokens)?);
+                    }
                     n => {
-                        return Err(Error::new_spanned(mac, format!("Unknown macro: `{n}!`. Use only `state!` and `transition!` macros here.")));
+                        return Err(Error::new_spanned(mac, format!("Unknown macro: `{n}!`. Use only `state!`, `transition!` and `ignore!` macros here.")));
                     }
                 }
             } else {
                 return Err(Error::new_spanned(
                     item,
-                    "Unexpected. Use only `state!` and `transition!` macros here.",
+                    "Unexpected. Use only `state!`, `transition!` and `ignore!` macros here.",
                 ));
             }
         }
@@ -125,6 +148,7 @@ impl Parse for Fsm {
         Ok(Self {
             entry_exit_handlers,
             transitions,
+            ignores,
             item_impl,
         })
     }
