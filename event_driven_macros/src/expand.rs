@@ -79,6 +79,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
 
     let mut command_matches = Vec::with_capacity(fsm.transitions.len());
     let mut event_matches = Vec::with_capacity(fsm.transitions.len());
+
     for t in &fsm.transitions {
         let from_state = if let Type::Infer(_) = t.from_state {
             None
@@ -184,6 +185,25 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         }
     }
 
+    for i in &fsm.ignores {
+        let from_state = if let Type::Infer(_) = i.from_state {
+            None
+        } else {
+            Some(ident_from_type(&i.from_state)?)
+        };
+        let command = ident_from_type(&i.command)?;
+
+        if let Some(from_state) = from_state {
+            command_matches.push(quote!(
+                (#state_enum::#from_state(s), #command_enum::#command(c)) => None,
+            ));
+        } else {
+            command_matches.push(quote!(
+                (_, #command_enum::#command(c)) => None,
+            ));
+        }
+    }
+
     fsm.item_impl.items = vec![
         parse2::<ImplItem>(quote!(
             fn for_command(
@@ -193,7 +213,6 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             ) -> Option<#event_enum> {
                 match (s, c) {
                     #( #command_matches )*
-                    _ => None,
                 }
             }
         ))

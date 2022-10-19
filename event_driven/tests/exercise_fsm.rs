@@ -60,6 +60,8 @@ impl<SE: EffectHandlers> Fsm<State, Input, Output, EffectHandlerBox<SE>> for MyF
     transition!(_ => I1 => O1 => A);
     transition!(_ => I2 => O2);
     transition!(_ => I3);
+
+    ignore!(B => I0);
 }
 
 impl<SE: EffectHandlers> MyFsm<SE> {
