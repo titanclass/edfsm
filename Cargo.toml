@@ -1,6 +1,6 @@
 [workspace]
 
 members = [
-    "event_driven",
-    "event_driven_macros"
+    "event-driven",
+    "event-driven-macros"
 ]

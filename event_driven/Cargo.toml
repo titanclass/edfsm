@@ -1,7 +1,0 @@
-[package]
-name = "edfsm"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-event_driven_macros = { path = "../event_driven_macros" }

@@ -1,0 +1,10 @@
+[package]
+name = "edfsm"
+version = "0.5.0"
+edition = "2021"
+description = "Event Driven Finite State Machine library"
+license = "Apache-2.0"
+repository = "https://github.com/titanclass/edfsm.git"
+
+[dependencies]
+event-driven-macros = { path = "../event-driven-macros", version = "0.5.0" }
