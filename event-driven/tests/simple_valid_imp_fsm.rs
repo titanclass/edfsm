@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "async_trait_lib"), feature(async_fn_in_trait))]
+
 // Declare our state, commands and events
 
 use edfsm::{impl_fsm, Fsm};
@@ -41,20 +43,21 @@ impl EffectHandlers {
         self.stopped += 1;
     }
 
-    pub fn from_running(&mut self) {
+    pub fn exit_running(&mut self) {
         self.transitioned_started_to_stopped += 1;
     }
 
-    pub fn to_running(&mut self) {
+    pub fn enter_running(&mut self) {
         self.transitioned_stopped_to_started += 1;
     }
 }
 
 // Declare the FSM itself
 
-struct MyFsm {}
+struct MyFsm;
 
 #[impl_fsm]
+#[cfg_attr(feature = "async_trait_lib", async_trait::async_trait(?Send))]
 impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
     state!(Running / entry);
     state!(Running / exit);
@@ -67,24 +70,24 @@ impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
 }
 
 impl MyFsm {
-    fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
-        se.to_running()
+    async fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
+        se.enter_running()
     }
 
-    fn for_running_stop(_s: &Running, _c: Stop, se: &mut EffectHandlers) -> Option<Stopped> {
+    async fn for_running_stop(_s: &Running, _c: Stop, se: &mut EffectHandlers) -> Option<Stopped> {
         se.stop_something();
         Some(Stopped)
     }
 
-    fn on_exit_running(_old_s: &Running, se: &mut EffectHandlers) {
-        se.from_running()
+    async fn on_exit_running(_old_s: &Running, se: &mut EffectHandlers) {
+        se.exit_running()
     }
 
     fn on_running_stopped(_s: &Running, _e: &Stopped) -> Option<Idle> {
         Some(Idle)
     }
 
-    fn for_idle_start(_s: &Idle, _c: Start, se: &mut EffectHandlers) -> Option<Started> {
+    async fn for_idle_start(_s: &Idle, _c: Start, se: &mut EffectHandlers) -> Option<Started> {
         se.start_something();
         Some(Started)
     }
@@ -94,8 +97,8 @@ impl MyFsm {
     }
 }
 
-#[test]
-fn main() {
+#[tokio::test]
+async fn main() {
     // Initialize our effect handlers
 
     let mut se = EffectHandlers {
@@ -107,7 +110,7 @@ fn main() {
 
     // Finally, test the FSM by stepping through various states
 
-    let (e, t) = MyFsm::step(&State::Idle(Idle), Command::Start(Start), &mut se);
+    let (e, t) = MyFsm::step(&State::Idle(Idle), Command::Start(Start), &mut se).await;
     assert!(matches!(e, Some(Event::Started(Started))));
     assert!(matches!(t, Some(State::Running(Running))));
     assert_eq!(se.started, 1);
@@ -115,7 +118,7 @@ fn main() {
     assert_eq!(se.transitioned_started_to_stopped, 0);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
-    let (e, t) = MyFsm::step(&State::Running(Running), Command::Start(Start), &mut se);
+    let (e, t) = MyFsm::step(&State::Running(Running), Command::Start(Start), &mut se).await;
     assert!(e.is_none());
     assert!(t.is_none());
     assert_eq!(se.started, 1);
@@ -123,7 +126,7 @@ fn main() {
     assert_eq!(se.transitioned_started_to_stopped, 0);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
-    let (e, t) = MyFsm::step(&State::Running(Running), Command::Stop(Stop), &mut se);
+    let (e, t) = MyFsm::step(&State::Running(Running), Command::Stop(Stop), &mut se).await;
     assert!(matches!(e, Some(Event::Stopped(Stopped))));
     assert!(matches!(t, Some(State::Idle(Idle))));
     assert_eq!(se.started, 1);
@@ -131,7 +134,7 @@ fn main() {
     assert_eq!(se.transitioned_started_to_stopped, 1);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
-    let (e, t) = MyFsm::step(&&State::Idle(Idle), Command::Stop(Stop), &mut se);
+    let (e, t) = MyFsm::step(&State::Idle(Idle), Command::Stop(Stop), &mut se).await;
     assert!(e.is_none());
     assert!(t.is_none());
     assert_eq!(se.started, 1);

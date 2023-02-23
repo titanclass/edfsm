@@ -5,7 +5,8 @@
 //!
 //! For more background on [Event-driven Finite State Machines](http://christopherhunt-software.blogspot.com/2021/02/event-driven-finite-state-machines.html).
 
-#![no_std]
+#![cfg_attr(not(any(feature = "async_trait_lib", test)), no_std)]
+#![cfg_attr(not(feature = "async_trait_lib"), feature(async_fn_in_trait))]
 
 pub use event_driven_macros::impl_fsm;
 
@@ -25,11 +26,14 @@ pub use event_driven_macros::impl_fsm;
 /// C  = Command        - the command(s) that are able to be processed on your FSM
 /// E  = Event          - the event(s) that are emitted having performed a command
 /// SE = State Effect   - the effect handler
-pub trait Fsm<S, C, E, SE> {
+#[cfg_attr(feature = "async_trait_lib", async_trait::async_trait(?Send))]
+// FIXME:  Static not require once we remove async-trait lib. Type C must outlive the trait with
+// the library.
+pub trait Fsm<S, C: 'static, E, SE> {
     /// Given a state and command, optionally emit an event. Can perform side
     /// effects along the way. This function is generally only called from the
     /// `run` function.
-    fn for_command(s: &S, c: C, se: &mut SE) -> Option<E>;
+    async fn for_command(s: &S, c: C, se: &mut SE) -> Option<E>;
 
     /// Given a state and event, produce a transition, which could transition to
     /// the next state. No side effects are to be performed. Can be used to replay
@@ -38,11 +42,11 @@ pub trait Fsm<S, C, E, SE> {
 
     /// Optional effect on exiting a state i.e. transitioning out of state `S` into
     /// another.
-    fn on_exit(_s: &S, _se: &mut SE) {}
+    async fn on_exit(_s: &S, _se: &mut SE) {}
 
     /// Optional effect on entering a state i.e. transitioning in to state `S` from
     /// another.
-    fn on_entry(_s: &S, _se: &mut SE) {}
+    async fn on_entry(_s: &S, _se: &mut SE) {}
 
     /// Determines whether an actual state transition is to occur given two states, 'S'.
     fn is_transitioning(s0: &S, s1: &S) -> bool;
@@ -52,14 +56,14 @@ pub trait Fsm<S, C, E, SE> {
     /// producing an event and transitioning to a new state. Also
     /// applies any "Entry/" or "Exit/" processing when arriving
     /// at a new state.
-    fn step(s: &S, c: C, se: &mut SE) -> (Option<E>, Option<S>) {
-        let e = Self::for_command(s, c, se);
+    async fn step(s: &S, c: C, se: &mut SE) -> (Option<E>, Option<S>) {
+        let e = Self::for_command(s, c, se).await;
         let t = if let Some(e) = &e {
             let t = Self::on_event(s, e);
             if let Some(new_s) = &t {
                 if Self::is_transitioning(s, new_s) {
-                    Self::on_exit(s, se);
-                    Self::on_entry(new_s, se);
+                    Self::on_exit(s, se).await;
+                    Self::on_entry(new_s, se).await;
                 }
             };
             t
@@ -74,12 +78,15 @@ pub trait Fsm<S, C, E, SE> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_step() {
+    #[tokio::test]
+    async fn test_step() {
         // Declare our state, commands and events
 
+        #[derive(Debug)]
         struct Idle;
+        #[derive(Debug)]
         struct Running;
+        #[derive(Debug)]
         enum State {
             Idle(Idle),
             Running(Running),
@@ -109,7 +116,7 @@ mod tests {
         }
 
         impl EffectHandlers {
-            pub fn start_something(&mut self) {
+            pub async fn start_something(&mut self) {
                 self.started += 1;
             }
 
@@ -117,11 +124,11 @@ mod tests {
                 self.stopped += 1;
             }
 
-            pub fn from_running(&mut self) {
+            pub fn exit_running(&mut self) {
                 self.transitioned_started_to_stopped += 1;
             }
 
-            pub fn to_running(&mut self) {
+            pub fn enter_running(&mut self) {
                 self.transitioned_stopped_to_started += 1;
             }
         }
@@ -130,14 +137,15 @@ mod tests {
 
         struct MyFsm {}
 
+        #[cfg_attr(feature = "async_trait_lib", async_trait::async_trait(?Send))]
         impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
-            fn for_command(s: &State, c: Command, se: &mut EffectHandlers) -> Option<Event> {
+            async fn for_command(s: &State, c: Command, se: &mut EffectHandlers) -> Option<Event> {
                 match (s, c) {
                     (State::Running(s), Command::Stop(c)) => {
-                        Self::for_running_stop(s, c, se).map(|r| Event::Stopped(r))
+                        Self::for_running_stop(s, c, se).map(Event::Stopped)
                     }
                     (State::Idle(s), Command::Start(c)) => {
-                        Self::for_idle_start(s, c, se).map(|r| Event::Started(r))
+                        Self::for_idle_start(s, c, se).await.map(Event::Started)
                     }
                     _ => None,
                 }
@@ -146,10 +154,10 @@ mod tests {
             fn on_event(s: &State, e: &Event) -> Option<State> {
                 match (s, e) {
                     (State::Running(s), Event::Stopped(e)) => {
-                        Self::on_running_stopped(s, e).map(|r| State::Idle(r))
+                        Self::on_running_stopped(s, e).map(State::Idle)
                     }
                     (State::Idle(s), Event::Started(e)) => {
-                        Self::on_idle_started(s, e).map(|r| State::Running(r))
+                        Self::on_idle_started(s, e).map(State::Running)
                     }
                     _ => None,
                 }
@@ -158,20 +166,19 @@ mod tests {
             // Let's implement this optional function to show how entry/exit
             // processing can be achieved, and also confirm that our FSM is
             // calling it.
-            fn on_entry(new_s: &State, se: &mut EffectHandlers) {
-                match new_s {
-                    State::Running(s) => Self::on_entry_running(s, se),
-                    _ => (),
+
+            async fn on_entry(new_s: &State, se: &mut EffectHandlers) {
+                if let State::Running(s) = new_s {
+                    Self::on_entry_running(s, se)
                 }
             }
 
             // Let's implement this optional function to show how entry/exit
             // processing can be achieved, and also confirm that our FSM is
             // calling it.
-            fn on_exit(old_s: &State, se: &mut EffectHandlers) {
-                match old_s {
-                    State::Running(s) => Self::on_exit_running(s, se),
-                    _ => (),
+            async fn on_exit(old_s: &State, se: &mut EffectHandlers) {
+                if let State::Running(s) = old_s {
+                    Self::on_exit_running(s, se)
                 }
             }
 
@@ -186,7 +193,7 @@ mod tests {
 
         impl MyFsm {
             fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
-                se.to_running()
+                se.enter_running()
             }
 
             fn for_running_stop(
@@ -199,15 +206,19 @@ mod tests {
             }
 
             fn on_exit_running(_old_s: &Running, se: &mut EffectHandlers) {
-                se.from_running()
+                se.exit_running()
             }
 
             fn on_running_stopped(_s: &Running, _e: &Stopped) -> Option<Idle> {
                 Some(Idle)
             }
 
-            fn for_idle_start(_s: &Idle, _c: Start, se: &mut EffectHandlers) -> Option<Started> {
-                se.start_something();
+            async fn for_idle_start(
+                _s: &Idle,
+                _c: Start,
+                se: &mut EffectHandlers,
+            ) -> Option<Started> {
+                se.start_something().await;
                 Some(Started)
             }
 
@@ -227,7 +238,7 @@ mod tests {
 
         // Finally, test the FSM by stepping through various states
 
-        let (e, t) = MyFsm::step(&State::Idle(Idle), Command::Start(Start), &mut se);
+        let (e, t) = MyFsm::step(&State::Idle(Idle), Command::Start(Start), &mut se).await;
         assert!(matches!(e, Some(Event::Started(Started))));
         assert!(matches!(t, Some(State::Running(Running))));
         assert_eq!(se.started, 1);
@@ -235,7 +246,7 @@ mod tests {
         assert_eq!(se.transitioned_started_to_stopped, 0);
         assert_eq!(se.transitioned_stopped_to_started, 1);
 
-        let (e, t) = MyFsm::step(&State::Running(Running), Command::Start(Start), &mut se);
+        let (e, t) = MyFsm::step(&State::Running(Running), Command::Start(Start), &mut se).await;
         assert!(e.is_none());
         assert!(t.is_none());
         assert_eq!(se.started, 1);
@@ -243,7 +254,7 @@ mod tests {
         assert_eq!(se.transitioned_started_to_stopped, 0);
         assert_eq!(se.transitioned_stopped_to_started, 1);
 
-        let (e, t) = MyFsm::step(&State::Running(Running), Command::Stop(Stop), &mut se);
+        let (e, t) = MyFsm::step(&State::Running(Running), Command::Stop(Stop), &mut se).await;
         assert!(matches!(e, Some(Event::Stopped(Stopped))));
         assert!(matches!(t, Some(State::Idle(Idle))));
         assert_eq!(se.started, 1);
@@ -251,7 +262,7 @@ mod tests {
         assert_eq!(se.transitioned_started_to_stopped, 1);
         assert_eq!(se.transitioned_stopped_to_started, 1);
 
-        let (e, t) = MyFsm::step(&&State::Idle(Idle), Command::Stop(Stop), &mut se);
+        let (e, t) = MyFsm::step(&State::Idle(Idle), Command::Stop(Stop), &mut se).await;
         assert!(e.is_none());
         assert!(t.is_none());
         assert_eq!(se.started, 1);

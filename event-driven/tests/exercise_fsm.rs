@@ -1,3 +1,5 @@
+#![cfg_attr(not(feature = "async_trait_lib"), feature(async_fn_in_trait))]
+
 // Declare our state, commands and events
 
 use std::marker::PhantomData;
@@ -48,6 +50,7 @@ struct MyFsm<SE: EffectHandlers> {
 }
 
 #[impl_fsm]
+#[cfg_attr(feature = "async_trait_lib", async_trait::async_trait(?Send))]
 impl<SE: EffectHandlers> Fsm<State, Input, Output, EffectHandlerBox<SE>> for MyFsm<SE> {
     state!(B / entry);
     state!(B / exit);
@@ -65,7 +68,7 @@ impl<SE: EffectHandlers> Fsm<State, Input, Output, EffectHandlerBox<SE>> for MyF
 }
 
 impl<SE: EffectHandlers> MyFsm<SE> {
-    fn for_a_i0(_s: &A, _c: I0, se: &mut EffectHandlerBox<SE>) -> Option<O0> {
+    async fn for_a_i0(_s: &A, _c: I0, se: &mut EffectHandlerBox<SE>) -> Option<O0> {
         se.0.say_hi();
         Some(O0)
     }
@@ -74,9 +77,9 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(B)
     }
 
-    fn on_entry_b(_to_s: &B, _se: &mut EffectHandlerBox<SE>) {}
+    async fn on_entry_b(_to_s: &B, _se: &mut EffectHandlerBox<SE>) {}
 
-    fn for_b_i1(_s: &B, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
+    async fn for_b_i1(_s: &B, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
         Some(O1)
     }
 
@@ -84,15 +87,15 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(State::A(A))
     }
 
-    fn for_b_i2(_s: &B, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
+    async fn for_b_i2(_s: &B, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
         Some(O2)
     }
 
-    fn for_b_i3(_s: &B, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
+    async fn for_b_i3(_s: &B, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
 
-    fn on_exit_b(_old_s: &B, _se: &mut EffectHandlerBox<SE>) {}
+    async fn on_exit_b(_old_s: &B, _se: &mut EffectHandlerBox<SE>) {}
 
-    fn for_any_i1(_s: &State, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
+    async fn for_any_i1(_s: &State, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
         Some(O1)
     }
 
@@ -100,7 +103,7 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(A)
     }
 
-    fn for_any_i2(_s: &State, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
+    async fn for_any_i2(_s: &State, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
         Some(O2)
     }
 
@@ -108,11 +111,11 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(State::A(A))
     }
 
-    fn for_any_i3(_s: &State, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
+    async fn for_any_i3(_s: &State, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
 }
 
-#[test]
-fn main() {
+#[tokio::test]
+async fn main() {
     struct MyEffectHandlers;
     impl EffectHandlers for MyEffectHandlers {
         fn say_hi(&self) {
@@ -121,8 +124,8 @@ fn main() {
     }
     let mut se = EffectHandlerBox(MyEffectHandlers);
 
-    let _ = MyFsm::step(&State::A(A), Input::I0(I0), &mut se);
-    let _ = MyFsm::step(&State::B(B), Input::I1(I1), &mut se);
-    let _ = MyFsm::step(&State::B(B), Input::I2(I2), &mut se);
-    let _ = MyFsm::step(&State::B(B), Input::I3(I3), &mut se);
+    let _ = MyFsm::step(&State::A(A), Input::I0(I0), &mut se).await;
+    let _ = MyFsm::step(&State::B(B), Input::I1(I1), &mut se).await;
+    let _ = MyFsm::step(&State::B(B), Input::I2(I2), &mut se).await;
+    let _ = MyFsm::step(&State::B(B), Input::I3(I3), &mut se).await;
 }

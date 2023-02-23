@@ -66,13 +66,13 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             let handler = format_ident!("on_entry_{}", state);
             let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
             entry_matches.push(quote!(
-                #state_enum::#state(s) => Self::#handler(s, se),
+                #state_enum::#state(s) => Self::#handler(s, se).await,
             ));
         } else {
             let handler = format_ident!("on_exit_{}", state);
             let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
             exit_matches.push(quote!(
-                #state_enum::#state(s) => Self::#handler(s, se),
+                #state_enum::#state(s) => Self::#handler(s, se).await,
             ));
         };
     }
@@ -107,13 +107,13 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             if let Some(event) = event {
                 command_matches.push(quote!(
                     (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).map(|r| #event_enum::#event(r))
+                        Self::#command_handler(s, c, se).await.map(|r| #event_enum::#event(r))
                     }
                 ));
             } else {
                 command_matches.push(quote!(
                     (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se);
+                        Self::#command_handler(s, c, se).await;
                         None
                     }
                 ));
@@ -123,13 +123,13 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             if let Some(event) = event {
                 command_matches.push(quote!(
                     (_, #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).map(|r| #event_enum::#event(r))
+                        Self::#command_handler(s, c, se).await.map(|r| #event_enum::#event(r))
                     }
                 ));
             } else {
                 command_matches.push(quote!(
                     (_, #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se);
+                        Self::#command_handler(s, c, se).await;
                         None
                     }
                 ));
@@ -206,7 +206,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
 
     fsm.item_impl.items = vec![
         parse2::<ImplItem>(quote!(
-            fn for_command(
+            async fn for_command(
                 s: &#state_enum,
                 c: #command_enum,
                 se: &mut #effect_handlers,
@@ -230,7 +230,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         ))
         .unwrap(),
         parse2::<ImplItem>(quote!(
-            fn on_entry(new_s: &#state_enum, se: &mut #effect_handlers) {
+            async fn on_entry(new_s: &#state_enum, se: &mut #effect_handlers) {
                 match new_s {
                     #( #entry_matches )*
                     _ => {}
@@ -239,7 +239,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         ))
         .unwrap(),
         parse2::<ImplItem>(quote!(
-            fn on_exit(old_s: &#state_enum, se: &mut #effect_handlers) {
+            async fn on_exit(old_s: &#state_enum, se: &mut #effect_handlers) {
                 match old_s {
                     #( #exit_matches )*
                     _ => {}

@@ -8,4 +8,12 @@ readme = "../README.md"
 repository = "https://github.com/titanclass/edfsm.git"
 
 [dependencies]
+async-trait = { version = "0.1.64", optional = true }
 event-driven-macros = { path = "../event-driven-macros", version = "0.5.0" }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
+
+[features]
+default = ["async_trait_lib"]
+async_trait_lib = ["dep:async-trait"]
