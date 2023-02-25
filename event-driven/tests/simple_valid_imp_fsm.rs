@@ -41,11 +41,11 @@ impl EffectHandlers {
         self.stopped += 1;
     }
 
-    pub fn from_running(&mut self) {
+    pub fn exit_running(&mut self) {
         self.transitioned_started_to_stopped += 1;
     }
 
-    pub fn to_running(&mut self) {
+    pub fn enter_running(&mut self) {
         self.transitioned_stopped_to_started += 1;
     }
 }
@@ -68,7 +68,7 @@ impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
 
 impl MyFsm {
     fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
-        se.to_running()
+        se.enter_running()
     }
 
     fn for_running_stop(_s: &Running, _c: Stop, se: &mut EffectHandlers) -> Option<Stopped> {
@@ -77,7 +77,7 @@ impl MyFsm {
     }
 
     fn on_exit_running(_old_s: &Running, se: &mut EffectHandlers) {
-        se.from_running()
+        se.exit_running()
     }
 
     fn on_running_stopped(_s: &Running, _e: &Stopped) -> Option<Idle> {
@@ -131,7 +131,7 @@ fn main() {
     assert_eq!(se.transitioned_started_to_stopped, 1);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
-    let (e, t) = MyFsm::step(&&State::Idle(Idle), Command::Stop(Stop), &mut se);
+    let (e, t) = MyFsm::step(&State::Idle(Idle), Command::Stop(Stop), &mut se);
     assert!(e.is_none());
     assert!(t.is_none());
     assert_eq!(se.started, 1);

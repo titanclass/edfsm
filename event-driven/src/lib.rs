@@ -18,7 +18,11 @@ pub use event_driven_macros::impl_fsm;
 /// of effects e.g. different ones when testing.
 ///
 /// Effects are also synchronous. If an effect handler must communicate, say, with a task in a
-/// non-blocking fashion, then the state machine should represent this intermediate state.
+/// non-blocking fashion, then the state machine should represent this intermediate state. For
+/// example, a channel could be used to communicate with such a task with `try_send` being used
+/// and then causing a state transition in relation to that result. While this approach adds
+/// steps to a state machine, it does allow them to remain responsive to receiving more
+/// commands.
 ///
 /// The generic types refer to:
 /// S  = State          - the state of your FSM
@@ -117,11 +121,11 @@ mod tests {
                 self.stopped += 1;
             }
 
-            pub fn from_running(&mut self) {
+            pub fn exit_running(&mut self) {
                 self.transitioned_started_to_stopped += 1;
             }
 
-            pub fn to_running(&mut self) {
+            pub fn enter_running(&mut self) {
                 self.transitioned_stopped_to_started += 1;
             }
         }
@@ -134,10 +138,10 @@ mod tests {
             fn for_command(s: &State, c: Command, se: &mut EffectHandlers) -> Option<Event> {
                 match (s, c) {
                     (State::Running(s), Command::Stop(c)) => {
-                        Self::for_running_stop(s, c, se).map(|r| Event::Stopped(r))
+                        Self::for_running_stop(s, c, se).map(Event::Stopped)
                     }
                     (State::Idle(s), Command::Start(c)) => {
-                        Self::for_idle_start(s, c, se).map(|r| Event::Started(r))
+                        Self::for_idle_start(s, c, se).map(Event::Started)
                     }
                     _ => None,
                 }
@@ -146,10 +150,10 @@ mod tests {
             fn on_event(s: &State, e: &Event) -> Option<State> {
                 match (s, e) {
                     (State::Running(s), Event::Stopped(e)) => {
-                        Self::on_running_stopped(s, e).map(|r| State::Idle(r))
+                        Self::on_running_stopped(s, e).map(State::Idle)
                     }
                     (State::Idle(s), Event::Started(e)) => {
-                        Self::on_idle_started(s, e).map(|r| State::Running(r))
+                        Self::on_idle_started(s, e).map(State::Running)
                     }
                     _ => None,
                 }
@@ -159,9 +163,8 @@ mod tests {
             // processing can be achieved, and also confirm that our FSM is
             // calling it.
             fn on_entry(new_s: &State, se: &mut EffectHandlers) {
-                match new_s {
-                    State::Running(s) => Self::on_entry_running(s, se),
-                    _ => (),
+                if let State::Running(s) = new_s {
+                    Self::on_entry_running(s, se)
                 }
             }
 
@@ -169,9 +172,8 @@ mod tests {
             // processing can be achieved, and also confirm that our FSM is
             // calling it.
             fn on_exit(old_s: &State, se: &mut EffectHandlers) {
-                match old_s {
-                    State::Running(s) => Self::on_exit_running(s, se),
-                    _ => (),
+                if let State::Running(s) = old_s {
+                    Self::on_exit_running(s, se)
                 }
             }
 
@@ -186,7 +188,7 @@ mod tests {
 
         impl MyFsm {
             fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
-                se.to_running()
+                se.enter_running()
             }
 
             fn for_running_stop(
@@ -199,7 +201,7 @@ mod tests {
             }
 
             fn on_exit_running(_old_s: &Running, se: &mut EffectHandlers) {
-                se.from_running()
+                se.exit_running()
             }
 
             fn on_running_stopped(_s: &Running, _e: &Stopped) -> Option<Idle> {
@@ -251,7 +253,7 @@ mod tests {
         assert_eq!(se.transitioned_started_to_stopped, 1);
         assert_eq!(se.transitioned_stopped_to_started, 1);
 
-        let (e, t) = MyFsm::step(&&State::Idle(Idle), Command::Stop(Stop), &mut se);
+        let (e, t) = MyFsm::step(&State::Idle(Idle), Command::Stop(Stop), &mut se);
         assert!(e.is_none());
         assert!(t.is_none());
         assert_eq!(se.started, 1);
