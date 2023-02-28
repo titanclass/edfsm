@@ -20,12 +20,16 @@ state, command and event types are handled by the developer.
 Here is an example given the declaration of states, commands, events and an effect handler:
 
 ```rust
-struct MyFsm {}
+struct MyFsm;
 
 #[impl_fsm]
-impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
+impl Fsm for MyFsm {
+    type S = State;
+    type C = Command;
+    type E = Event;
+    type SE = EffectHandlers;
+
     state!(Running / entry);
-    state!(Running / exit);
 
     transition!(Idle    => Start => Started => Running);
     transition!(Running => Stop  => Stopped => Idle);
@@ -35,13 +39,13 @@ impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
 }
 ```
 
-The `state!` macro declares state-related attributes. At this time, entry and exit
-handlers can be declared. In our example, the macro will ensure that an `on_entry_running`
-and an `on_exit_running` method will be called for `MyFsm`. The developer is then
+The `state!` macro declares state-related attributes. At this time, entry 
+handlers can be declared. In our example, the macro will ensure that a `on_entry_running`
+method will be called for `MyFsm`. The developer is then
 required to implement these methods e.g.:
 
 ```rust
-fn on_exit_running(_old_s: &Running, _se: &mut EffectHandlers) {
+fn on_entry_running(_old_s: &Running, _se: &mut EffectHandlers) {
     // Do something
 }
 ```
@@ -73,12 +77,58 @@ The `ignore!` macro describes those states and commands that should be ignored g
 
 It is possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
 
-Please see the event_driven/tests folder for complete examples.
+State machines are then advanced given a mutable state and command. An optional event can be
+emitted along with a possible state transition e.g.:
+
+```rust
+let mut s = State::Idle(Idle);
+let c = Command::Start(Start);
+// Now step the state machine with the state and command,
+// and, an (undeclared) effect handler.
+let (e, t) = MyFsm::step(&mut s, c, &mut se);
+```
+
+State can also be re-constituted by replaying events. If there is no transition to an entirely
+new state then the existing state may still have been updated.
+Here is an example of applying an event to state with the update of state
+if necessary and a bool of `t` indicating true if a transition occurred.
+
+```rust
+let t = MyFsm::on_event(&mut s, &e);
+```
+
+Mutating state can be very useful where a state itself represents
+a finer granularity of state with its fields, and so we wish to update them directly. 
+For example, given our previous representation of:
+
+```rust
+transition!(Running => Stop  => Stopped => Idle);
+```
+
+...if we change it to:
+
+```rust
+transition!(Running => Stop  => Stopped);
+```
+
+i.e. if we remove the target state, then the associated function will be able to mutate the
+state and no transition can be returned as they are mutually exclusive actions. Here is
+a sample signature in accordance with the above `transition`.
+
+```rust
+fn on_idle_started(s: &mut Idle, e: &Started) {
+    // `s` can now be mutated given some `e`.
+}
+```
+
+Please see the event_driven/tests folder for complete examples, including the ability to mutate
+the passed state in the absence of a target state i.e. when emitting an event but not
+transitioning.
 
 no_std
 ---
 
-The library is able to support`no_std`, particularly for usage on embedded targets.
+The library is able to support`no_std` and is designed for efficient usage with embedded targets.
 
 ## Contribution policy
 

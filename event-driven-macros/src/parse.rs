@@ -3,29 +3,24 @@ use std::mem;
 use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
-    parse2, Error, Ident, ImplItem, ImplItemMacro, ItemImpl, Result, Token, Type,
+    parse2, Error, Ident, ImplItem, ImplItemMacro, ImplItemType, ItemImpl, Result, Token, Type,
 };
 
 #[derive(Debug, Eq, PartialEq)]
-pub struct EntryExit {
-    pub is_entry: bool,
+pub struct Entry {
     pub state: Type,
 }
 
-impl Parse for EntryExit {
+impl Parse for Entry {
     fn parse(input: ParseStream) -> Result<Self> {
         let state = input.parse()?;
         input.parse::<Token![/]>()?;
         let ident = input.parse::<Ident>()?;
         let ident_str = ident.to_string();
-        let is_entry = if ident_str == "entry" {
-            true
-        } else if ident_str == "exit" {
-            false
-        } else {
-            return Err(Error::new_spanned(ident, format!("Unknown state qualifer: `/ {ident_str}`. Use only `/ entry` and `/ exit` to indicate entry and exit points here.")));
+        if ident_str != "entry" {
+            return Err(Error::new_spanned(ident, format!("Unknown state qualifer: `/ {ident_str}`. Use only `/ entry` to indicate entry points here.")));
         };
-        Ok(Self { is_entry, state })
+        Ok(Self { state })
     }
 }
 
@@ -103,7 +98,11 @@ impl Parse for Ignore {
 
 #[derive(Debug)]
 pub struct Fsm {
-    pub entry_exit_handlers: Vec<EntryExit>,
+    pub state_enum: Type,
+    pub command_enum: Type,
+    pub event_enum: Type,
+    pub effect_handlers: Type,
+    pub entry_handlers: Vec<Entry>,
     pub transitions: Vec<Transition>,
     pub ignores: Vec<Ignore>,
     pub item_impl: ItemImpl,
@@ -115,42 +114,81 @@ impl Parse for Fsm {
 
         let items = mem::take(&mut item_impl.items);
 
-        let mut entry_exit_handlers = vec![];
+        let mut state_enum = None;
+        let mut command_enum = None;
+        let mut event_enum = None;
+        let mut effect_handlers = None;
+        let mut entry_handlers = vec![];
         let mut transitions = vec![];
         let mut ignores = vec![];
 
         for item in items {
-            if let ImplItem::Macro(ImplItemMacro { mac, .. }) = item {
-                let path = mac.path.clone();
-                let macro_name = quote!(#path).to_string();
-                match macro_name.as_str() {
-                    "state" => {
-                        entry_exit_handlers.push(parse2(mac.tokens)?);
-                    }
-                    "transition" => {
-                        transitions.push(parse2::<Transition>(mac.tokens)?);
-                    }
-                    "ignore" => {
-                        ignores.push(parse2::<Ignore>(mac.tokens)?);
-                    }
-                    n => {
-                        return Err(Error::new_spanned(mac, format!("Unknown macro: `{n}!`. Use only `state!`, `transition!` and `ignore!` macros here.")));
+            match item {
+                ImplItem::Type(ImplItemType { ident, ty, .. }) => {
+                    let type_name = quote!(#ident).to_string();
+                    match type_name.as_str() {
+                        "S" => {
+                            state_enum = Some(ty);
+                        }
+                        "C" => {
+                            command_enum = Some(ty);
+                        }
+                        "E" => {
+                            event_enum = Some(ty);
+                        }
+                        "SE" => {
+                            effect_handlers = Some(ty);
+                        }
+                        n => {
+                            return Err(Error::new_spanned(ident, format!("Unknown associated types: `{n}!`. Use only `S`, `C`, `E` and `SE` here.")));
+                        }
                     }
                 }
-            } else {
-                return Err(Error::new_spanned(
-                    item,
-                    "Unexpected. Use only `state!`, `transition!` and `ignore!` macros here.",
-                ));
+                ImplItem::Macro(ImplItemMacro { mac, .. }) => {
+                    let path = mac.path.clone();
+                    let macro_name = quote!(#path).to_string();
+                    match macro_name.as_str() {
+                        "state" => {
+                            entry_handlers.push(parse2(mac.tokens)?);
+                        }
+                        "transition" => {
+                            transitions.push(parse2::<Transition>(mac.tokens)?);
+                        }
+                        "ignore" => {
+                            ignores.push(parse2::<Ignore>(mac.tokens)?);
+                        }
+                        n => {
+                            return Err(Error::new_spanned(mac, format!("Unknown macro: `{n}!`. Use only `state!`, `transition!` and `ignore!` macros here.")));
+                        }
+                    }
+                }
+                _ => {
+                    return Err(Error::new_spanned(
+                        item,
+                        "Unexpected. Use only the associated type declarations, and `state!`, `transition!` and `ignore!` macros here.",
+                    ));
+                }
             }
         }
-
-        Ok(Self {
-            entry_exit_handlers,
-            transitions,
-            ignores,
-            item_impl,
-        })
+        if let (Some(state_enum), Some(command_enum), Some(event_enum), Some(effect_handlers)) =
+            (state_enum, command_enum, event_enum, effect_handlers)
+        {
+            Ok(Self {
+                state_enum,
+                command_enum,
+                event_enum,
+                effect_handlers,
+                entry_handlers,
+                transitions,
+                ignores,
+                item_impl,
+            })
+        } else {
+            Err(Error::new_spanned(
+                item_impl,
+                "Unexpected. Missing one or more associated types: `{n}!`. Declare all of `S`, `C`, `E` and `SE` here.",
+            ))
+        }
     }
 }
 
@@ -161,11 +199,16 @@ mod tests {
     #[test]
     fn test_complex_parse() {
         let fsm = parse2::<Fsm>(quote!(
-            impl<'d, R> Fsm<State, Command, Event, EffectHandlers<'d, R>> for Configurator<'d, R>
+            impl<'d, R> Fsm for Configurator<'d, R>
             where
                 R: RngCore + 'd,
             {
-                state!(Uninitialised / exit);
+                type S = State;
+                type C = Command;
+                type E = Event;
+                type SE = EffectHandlers<'d, R>;
+
+                state!(Uninitialised / entry);
 
                 transition!(Uninitialised  => GenerateRootKey => RootKeyGenerated => SsInitialised);
                 transition!(SsInitialised  => GenerateVpnKey  => VpnKeyGenerated  => VpnInitialised);
@@ -176,9 +219,17 @@ mod tests {
             }
         )).unwrap();
 
+        assert_eq!(fsm.state_enum, parse2(quote!(State)).unwrap());
+        assert_eq!(fsm.command_enum, parse2(quote!(Command)).unwrap());
+        assert_eq!(fsm.event_enum, parse2(quote!(Event)).unwrap());
         assert_eq!(
-            fsm.entry_exit_handlers,
-            [parse2(quote!(Uninitialised / exit)).unwrap()]
+            fsm.effect_handlers,
+            parse2(quote!(EffectHandlers<'d, R>)).unwrap()
+        );
+
+        assert_eq!(
+            fsm.entry_handlers,
+            [parse2(quote!(Uninitialised / entry)).unwrap()]
         );
 
         assert_eq!(
@@ -212,7 +263,11 @@ mod tests {
     #[test]
     fn test_multi_targets() {
         let fsm = parse2::<Fsm>(quote!(
-            impl Fsm<State, Command, Event, EffectHandlers> for SomeFsm {
+            impl Fsm for SomeFsm {
+                type S = State;
+                type C = Command;
+                type E = Event;
+                type SE = EffectHandlers<'d, R>;
                 transition!(S0  => C => E => S0 | S1);
             }
         ))
