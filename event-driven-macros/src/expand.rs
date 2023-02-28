@@ -216,12 +216,18 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         .unwrap(),
         parse2::<ImplItem>(quote!(
             fn on_event(
-                s: &mut #state_enum,
+                mut s: &mut #state_enum,
                 e: &#event_enum,
-            ) -> Option<#state_enum> {
-                match (s, e) {
+            ) -> bool {
+                let new_s = match (&mut s, e) {
                     #( #event_matches )*
                     _ => None,
+                };
+                if let Some(new_s) = new_s {
+                    *s = new_s;
+                    true
+                } else {
+                    false
                 }
             }
         ))

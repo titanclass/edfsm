@@ -103,28 +103,28 @@ fn main() {
 
     let (e, t) = MyFsm::step(&mut State::Idle(Idle), Command::Start(Start), &mut se);
     assert!(matches!(e, Some(Event::Started(Started))));
-    assert!(matches!(t, Some(State::Running(Running))));
+    assert!(t);
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 0);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
     let (e, t) = MyFsm::step(&mut State::Running(Running), Command::Start(Start), &mut se);
     assert!(e.is_none());
-    assert!(t.is_none());
+    assert!(!t);
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 0);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
     let (e, t) = MyFsm::step(&mut State::Running(Running), Command::Stop(Stop), &mut se);
     assert!(matches!(e, Some(Event::Stopped(Stopped))));
-    assert!(matches!(t, Some(State::Idle(Idle))));
+    assert!(t);
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 1);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
     let (e, t) = MyFsm::step(&mut State::Idle(Idle), Command::Stop(Stop), &mut se);
     assert!(e.is_none());
-    assert!(t.is_none());
+    assert!(!t);
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 1);
     assert_eq!(se.transitioned_stopped_to_started, 1);
