@@ -146,7 +146,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             if let Some(event) = event {
                 let event_handler = lowercase_ident(&format_ident!("on_{}_{}", from_state, event));
                 event_matches.push(quote!(
-                    (#state_enum::#from_state(ref mut s), #event_enum::#event(e)) => {
+                    (#state_enum::#from_state(s), #event_enum::#event(e)) => {
                         Self::#event_handler(s, e);
                         None
                     }
