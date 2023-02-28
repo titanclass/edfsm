@@ -23,7 +23,7 @@ pub use event_driven_macros::impl_fsm;
 /// and then causing a state transition in relation to that result. While this approach adds
 /// steps to a state machine, it does allow them to remain responsive to receiving more
 /// commands.
-pub trait Fsm: Sized {
+pub trait Fsm {
     /// The state managed by the FSM
     type S;
     /// The command(s) that are able to be processed by the FSM
