@@ -49,20 +49,17 @@ pub trait Fsm: Sized {
 
     /// This is the main entry point to the event driven FSM.
     /// Runs the state machine for a command, optionally performing effects,
-    /// producing an event and possibly transitioning to a new state. Also
+    /// possibly producing an event and possibly transitioning to a new state. Also
     /// applies any "Entry/" processing when arriving at a new state.
-    fn step(s: &mut Self::S, c: Self::C, se: &mut Self::SE) -> (Option<Self::E>, bool) {
+    fn step(s: &mut Self::S, c: Self::C, se: &mut Self::SE) -> Option<Self::E> {
         let e = Self::for_command(s, c, se);
-        let t = if let Some(e) = &e {
+        if let Some(e) = &e {
             let t = Self::on_event(s, e);
             if t {
                 Self::on_entry(s, se);
             };
-            t
-        } else {
-            false
         };
-        (e, t)
+        e
     }
 }
 
@@ -205,30 +202,26 @@ mod tests {
 
         // Finally, test the FSM by stepping through various states
 
-        let (e, _t) = MyFsm::step(&mut State::Idle(Idle), Command::Start(Start), &mut se);
+        let e = MyFsm::step(&mut State::Idle(Idle), Command::Start(Start), &mut se);
         assert!(matches!(e, Some(Event::Started(Started))));
-        // assert!(matches!(t, Some(State::Running(Running))));
         assert_eq!(se.started, 1);
         assert_eq!(se.stopped, 0);
         assert_eq!(se.transitioned_stopped_to_started, 1);
 
-        let (e, _t) = MyFsm::step(&mut State::Running(Running), Command::Start(Start), &mut se);
+        let e = MyFsm::step(&mut State::Running(Running), Command::Start(Start), &mut se);
         assert!(e.is_none());
-        // assert!(t.is_none());
         assert_eq!(se.started, 1);
         assert_eq!(se.stopped, 0);
         assert_eq!(se.transitioned_stopped_to_started, 1);
 
-        let (e, _t) = MyFsm::step(&mut State::Running(Running), Command::Stop(Stop), &mut se);
+        let e = MyFsm::step(&mut State::Running(Running), Command::Stop(Stop), &mut se);
         assert!(matches!(e, Some(Event::Stopped(Stopped))));
-        // assert!(matches!(t, Some(State::Idle(Idle))));
         assert_eq!(se.started, 1);
         assert_eq!(se.stopped, 1);
         assert_eq!(se.transitioned_stopped_to_started, 1);
 
-        let (e, _t) = MyFsm::step(&mut State::Idle(Idle), Command::Stop(Stop), &mut se);
+        let e = MyFsm::step(&mut State::Idle(Idle), Command::Stop(Stop), &mut se);
         assert!(e.is_none());
-        // assert!(t.is_none());
         assert_eq!(se.started, 1);
         assert_eq!(se.stopped, 1);
         assert_eq!(se.transitioned_stopped_to_started, 1);

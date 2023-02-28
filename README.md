@@ -78,7 +78,7 @@ The `ignore!` macro describes those states and commands that should be ignored g
 It is possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
 
 State machines are then advanced given a mutable state and command. An optional event can be
-emitted, along with an indication of whether a state transition occurred e.g.:
+emitted along with a possible state transition e.g.:
 
 ```rust
 let mut s = State::Idle(Idle);
@@ -88,9 +88,8 @@ let c = Command::Start(Start);
 let (e, t) = MyFsm::step(&mut s, c, &mut se);
 ```
 
-State can also be re-constituted by replaying events. A bool indicates
-true if transition is returned. If there is no transition then the existing state
-may still have been updated.
+State can also be re-constituted by replaying events. If there is no transition to an entirely
+new state then the existing state may still have been updated.
 Here is an example of applying an event to state with the update of state
 if necessary and a bool of `t` indicating true if a transition occurred.
 
@@ -98,7 +97,7 @@ if necessary and a bool of `t` indicating true if a transition occurred.
 let t = MyFsm::on_event(&mut s, &e);
 ```
 
-Mutating state has been mentioned. This can be very useful where a state itself represents
+Mutating state can be very useful where a state itself represents
 a finer granularity of state with its fields, and so we wish to update them directly. 
 For example, given our previous representation of:
 
