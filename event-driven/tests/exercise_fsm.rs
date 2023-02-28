@@ -48,9 +48,13 @@ struct MyFsm<SE: EffectHandlers> {
 }
 
 #[impl_fsm]
-impl<SE: EffectHandlers> Fsm<State, Input, Output, EffectHandlerBox<SE>> for MyFsm<SE> {
+impl<SE: EffectHandlers> Fsm for MyFsm<SE> {
+    type S = State;
+    type C = Input;
+    type E = Output;
+    type SE = EffectHandlerBox<SE>;
+
     state!(B / entry);
-    state!(B / exit);
 
     transition!(A => I0 => O0 => B);
     transition!(B => I1 => O1 => A | B);
@@ -88,9 +92,9 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(O2)
     }
 
-    fn for_b_i3(_s: &B, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
+    fn on_b_o2(_s: &B, _e: &O2) {}
 
-    fn on_exit_b(_old_s: &B, _se: &mut EffectHandlerBox<SE>) {}
+    fn for_b_i3(_s: &B, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
 
     fn for_any_i1(_s: &State, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
         Some(O1)
@@ -104,9 +108,7 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(O2)
     }
 
-    fn on_any_o2(_s: &State, _e: &O2) -> Option<State> {
-        Some(State::A(A))
-    }
+    fn on_any_o2(_s: &mut State, _e: &O2) {}
 
     fn for_any_i3(_s: &State, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
 }
@@ -121,8 +123,8 @@ fn main() {
     }
     let mut se = EffectHandlerBox(MyEffectHandlers);
 
-    let _ = MyFsm::step(&State::A(A), Input::I0(I0), &mut se);
-    let _ = MyFsm::step(&State::B(B), Input::I1(I1), &mut se);
-    let _ = MyFsm::step(&State::B(B), Input::I2(I2), &mut se);
-    let _ = MyFsm::step(&State::B(B), Input::I3(I3), &mut se);
+    let _ = MyFsm::step(&mut State::A(A), Input::I0(I0), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Input::I1(I1), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Input::I2(I2), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Input::I3(I3), &mut se);
 }

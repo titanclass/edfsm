@@ -4,42 +4,16 @@ use quote::format_ident;
 use quote::quote;
 use quote::ToTokens;
 use syn::Ident;
-use syn::PathArguments;
 use syn::Type;
 use syn::{parse2, Error, ImplItem, Result};
 
 use crate::parse::Fsm;
 
 pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
-    let (state_enum, command_enum, event_enum, effect_handlers) = if let Some(trait_) =
-        &fsm.item_impl.trait_
-    {
+    if let Some(trait_) = &fsm.item_impl.trait_ {
         let trait_path = &trait_.1;
         if let Some(last_trait_segment) = trait_path.segments.last() {
-            if last_trait_segment.ident == "Fsm" {
-                if let PathArguments::AngleBracketed(fsm_trait_generic_args) =
-                    &last_trait_segment.arguments
-                {
-                    if fsm_trait_generic_args.args.len() == 4 {
-                        let mut args_iter = fsm_trait_generic_args.args.iter();
-                        let state_enum = args_iter.next().unwrap();
-                        let command_enum = args_iter.next().unwrap();
-                        let event_enum = args_iter.next().unwrap();
-                        let effect_handlers = args_iter.next().unwrap();
-                        (state_enum, command_enum, event_enum, effect_handlers)
-                    } else {
-                        return Err(Error::new_spanned(
-                        &fsm_trait_generic_args.args,
-                        "Expected the trait to be implemented with 4 generics representing State, Command, Event enums and the Event Handler.",
-                    ));
-                    }
-                } else {
-                    return Err(Error::new_spanned(
-                    &last_trait_segment.arguments,
-                    "Expected the trait to be implemented with 4 generics representing State, Command, Event enums and the Event Handler.",
-                ));
-                }
-            } else {
+            if last_trait_segment.ident != "Fsm" {
                 return Err(Error::new_spanned(
                     &last_trait_segment.ident,
                     "Expected the Fsm trait to be implemented.",
@@ -58,23 +32,19 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         ));
     };
 
-    let mut entry_matches = Vec::with_capacity(fsm.entry_exit_handlers.len());
-    let mut exit_matches = Vec::with_capacity(fsm.entry_exit_handlers.len());
-    for ee in &fsm.entry_exit_handlers {
+    let state_enum = &fsm.state_enum;
+    let command_enum = &fsm.command_enum;
+    let event_enum = &fsm.event_enum;
+    let effect_handlers = &fsm.effect_handlers;
+
+    let mut entry_matches = Vec::with_capacity(fsm.entry_handlers.len());
+    for ee in &fsm.entry_handlers {
         let state = ident_from_type(&ee.state)?;
-        if ee.is_entry {
-            let handler = format_ident!("on_entry_{}", state);
-            let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
-            entry_matches.push(quote!(
-                #state_enum::#state(s) => Self::#handler(s, se),
-            ));
-        } else {
-            let handler = format_ident!("on_exit_{}", state);
-            let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
-            exit_matches.push(quote!(
-                #state_enum::#state(s) => Self::#handler(s, se),
-            ));
-        };
+        let handler = format_ident!("on_entry_{}", state);
+        let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
+        entry_matches.push(quote!(
+            #state_enum::#state(s) => Self::#handler(s, se),
+        ));
     }
 
     let mut command_matches = Vec::with_capacity(fsm.transitions.len());
@@ -107,7 +77,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             if let Some(event) = event {
                 command_matches.push(quote!(
                     (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).map(|r| #event_enum::#event(r))
+                        Self::#command_handler(s, c, se).map(#event_enum::#event)
                     }
                 ));
             } else {
@@ -123,7 +93,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             if let Some(event) = event {
                 command_matches.push(quote!(
                     (_, #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).map(|r| #event_enum::#event(r))
+                        Self::#command_handler(s, c, se).map(#event_enum::#event)
                     }
                 ));
             } else {
@@ -144,7 +114,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                     if to_state_explicit {
                         event_matches.push(quote!(
                             (#state_enum::#from_state(s), #event_enum::#event(e)) => {
-                                Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
+                                Self::#event_handler(s, e).map(#state_enum::#to_state)
                             }
                         ));
                     } else {
@@ -160,25 +130,36 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                 let event_handler = lowercase_ident(&format_ident!("on_any_{}", event));
                 if to_state_explicit {
                     event_matches.push(quote!(
-                        (_, #event_enum::#event(e)) => {
-                            Self::#event_handler(s, e).map(|r| #state_enum::#to_state(r))
+                        (s, #event_enum::#event(e)) => {
+                            Self::#event_handler(s, e).map(#state_enum::#to_state)
                         }
                     ));
                 } else {
                     event_matches.push(quote!(
-                        (_, #event_enum::#event(e)) => {
+                        (s, #event_enum::#event(e)) => {
                             Self::#event_handler(s, e)
                         }
                     ));
                 }
             };
-        } else if from_state.is_none() {
+        } else if let Some(from_state) = from_state {
+            if let Some(event) = event {
+                let event_handler = lowercase_ident(&format_ident!("on_{}_{}", from_state, event));
+                event_matches.push(quote!(
+                    (#state_enum::#from_state(ref mut s), #event_enum::#event(e)) => {
+                        Self::#event_handler(s, e);
+                        None
+                    }
+                ));
+            }
+        } else {
             // from and to states are None
             if let Some(event) = event {
                 let event_handler = lowercase_ident(&format_ident!("on_any_{}", event));
                 event_matches.push(quote!(
-                    (_, #event_enum::#event(e)) => {
-                        Self::#event_handler(s, e)
+                    (s, #event_enum::#event(e)) => {
+                        Self::#event_handler(s, e);
+                        None
                     }
                 ));
             }
@@ -206,6 +187,22 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
 
     fsm.item_impl.items = vec![
         parse2::<ImplItem>(quote!(
+            type S = #state_enum;
+        ))
+        .unwrap(),
+        parse2::<ImplItem>(quote!(
+            type C = #command_enum;
+        ))
+        .unwrap(),
+        parse2::<ImplItem>(quote!(
+            type E = #event_enum;
+        ))
+        .unwrap(),
+        parse2::<ImplItem>(quote!(
+            type SE = #effect_handlers;
+        ))
+        .unwrap(),
+        parse2::<ImplItem>(quote!(
             fn for_command(
                 s: &#state_enum,
                 c: #command_enum,
@@ -219,7 +216,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         .unwrap(),
         parse2::<ImplItem>(quote!(
             fn on_event(
-                s: &#state_enum,
+                s: &mut #state_enum,
                 e: &#event_enum,
             ) -> Option<#state_enum> {
                 match (s, e) {
@@ -235,21 +232,6 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                     #( #entry_matches )*
                     _ => {}
                 }
-            }
-        ))
-        .unwrap(),
-        parse2::<ImplItem>(quote!(
-            fn on_exit(old_s: &#state_enum, se: &mut #effect_handlers) {
-                match old_s {
-                    #( #exit_matches )*
-                    _ => {}
-                }
-            }
-        ))
-        .unwrap(),
-        parse2::<ImplItem>(quote!(
-            fn is_transitioning(s0: &#state_enum, s1: &#state_enum) -> bool {
-                core::mem::discriminant(s0) != core::mem::discriminant(s1)
             }
         ))
         .unwrap(),
