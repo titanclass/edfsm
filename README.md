@@ -2,7 +2,7 @@ edfsm - Event Driven Finite State Machine
 ===
 
 Event driven Finite State Machines process commands (possibly created by other
-events), possibly performing some side effect, and possibly emitting events.
+events), possibly performing some async side effect, and possibly emitting events.
 
 Commands are processed against a provided state. Events can be applied to states
 to yield new states.
@@ -45,7 +45,7 @@ method will be called for `MyFsm`. The developer is then
 required to implement these methods e.g.:
 
 ```rust
-fn on_entry_running(_old_s: &Running, _se: &mut EffectHandlers) {
+async fn on_entry_running(_old_s: &Running, _se: &mut EffectHandlers) {
     // Do something
 }
 ```
@@ -59,7 +59,7 @@ The `transition!` macro declares an entire transition using the form:
 In our example, for the first transition, multiple methods will be called that the developer must provide e.g.:
 
 ```rust
-fn for_idle_start(_s: &Idle, _c: Start, _se: &mut EffectHandlers) -> Option<Started> {
+async fn for_idle_start(_s: &Idle, _c: Start, _se: &mut EffectHandlers) -> Option<Started> {
     // Perform some effect here if required. Effects are performed via the EffectHandler
     Some(Started)
 }
@@ -85,7 +85,7 @@ let mut s = State::Idle(Idle);
 let c = Command::Start(Start);
 // Now step the state machine with the state and command,
 // and, an (undeclared) effect handler.
-let (e, t) = MyFsm::step(&mut s, c, &mut se);
+let (e, t) = MyFsm::step(&mut s, c, &mut se).await;
 ```
 
 State can also be re-constituted by replaying events. If there is no transition to an entirely
@@ -130,11 +130,19 @@ no_std
 
 The library is able to support`no_std` and is designed for efficient usage with embedded targets.
 
-## Contribution policy
+
+Minimum supported Rust
+---
+
+This library requires a minimum of Rust version 1.75.0 stable (December 2023), but the most recent stable version of Rust is recommended.
+
+Contribution policy
+---
 
 Contributions via GitHub pull requests are gladly accepted from their original author. Along with any pull requests, please state that the contribution is your original work and that you license the work to the project under the project's open source license. Whether or not you state this explicitly, by submitting any copyrighted material via pull request, email, or other means you agree to license the material under the project's open source license and warrant that you have the legal authority to do so.
 
-## License
+License
+---
 
 This code is open source software licensed under the [Apache-2.0 license](./LICENSE).
 

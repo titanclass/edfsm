@@ -1,6 +1,6 @@
 // Declare our state, commands and events
 
-use std::marker::PhantomData;
+use std::{future::Future, marker::PhantomData};
 
 use edfsm::{impl_fsm, Fsm};
 
@@ -36,7 +36,7 @@ enum Output {
 // For more information: https://doc.rust-lang.org/nomicon/exotic-sizes.html#:~:text=Rust%20supports%20Dynamically%20Sized%20Types,DSTs%20are%20not%20normal%20types.
 
 trait EffectHandlers {
-    fn say_hi(&self);
+    fn say_hi(&self) -> impl Future<Output = ()>;
 }
 
 struct EffectHandlerBox<SE: EffectHandlers + ?Sized>(SE);
@@ -69,8 +69,8 @@ impl<SE: EffectHandlers> Fsm for MyFsm<SE> {
 }
 
 impl<SE: EffectHandlers> MyFsm<SE> {
-    fn for_a_i0(_s: &A, _c: I0, se: &mut EffectHandlerBox<SE>) -> Option<O0> {
-        se.0.say_hi();
+    async fn for_a_i0(_s: &A, _c: I0, se: &mut EffectHandlerBox<SE>) -> Option<O0> {
+        se.0.say_hi().await;
         Some(O0)
     }
 
@@ -78,9 +78,9 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(B)
     }
 
-    fn on_entry_b(_to_s: &B, _se: &mut EffectHandlerBox<SE>) {}
+    async fn on_entry_b(_to_s: &B, _se: &mut EffectHandlerBox<SE>) {}
 
-    fn for_b_i1(_s: &B, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
+    async fn for_b_i1(_s: &B, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
         Some(O1)
     }
 
@@ -88,15 +88,15 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(State::A(A))
     }
 
-    fn for_b_i2(_s: &B, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
+    async fn for_b_i2(_s: &B, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
         Some(O2)
     }
 
     fn on_b_o2(_s: &B, _e: &O2) {}
 
-    fn for_b_i3(_s: &B, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
+    async fn for_b_i3(_s: &B, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
 
-    fn for_any_i1(_s: &State, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
+    async fn for_any_i1(_s: &State, _c: I1, _se: &mut EffectHandlerBox<SE>) -> Option<O1> {
         Some(O1)
     }
 
@@ -104,27 +104,27 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(A)
     }
 
-    fn for_any_i2(_s: &State, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
+    async fn for_any_i2(_s: &State, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
         Some(O2)
     }
 
     fn on_any_o2(_s: &mut State, _e: &O2) {}
 
-    fn for_any_i3(_s: &State, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
+    async fn for_any_i3(_s: &State, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
 }
 
-#[test]
-fn main() {
+#[tokio::test]
+async fn main() {
     struct MyEffectHandlers;
     impl EffectHandlers for MyEffectHandlers {
-        fn say_hi(&self) {
+        async fn say_hi(&self) {
             println!("hi!");
         }
     }
     let mut se = EffectHandlerBox(MyEffectHandlers);
 
-    let _ = MyFsm::step(&mut State::A(A), Input::I0(I0), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Input::I1(I1), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Input::I2(I2), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Input::I3(I3), &mut se);
+    let _ = MyFsm::step(&mut State::A(A), Input::I0(I0), &mut se).await;
+    let _ = MyFsm::step(&mut State::B(B), Input::I1(I1), &mut se).await;
+    let _ = MyFsm::step(&mut State::B(B), Input::I2(I2), &mut se).await;
+    let _ = MyFsm::step(&mut State::B(B), Input::I3(I3), &mut se).await;
 }

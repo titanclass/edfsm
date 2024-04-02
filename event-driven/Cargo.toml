@@ -9,3 +9,7 @@ repository = "https://github.com/titanclass/edfsm.git"
 
 [dependencies]
 event-driven-macros = { path = "../event-driven-macros", version = "0.6.0" }
+
+[dev-dependencies]
+test-log = "0.2.11"
+tokio = {version = "1.23.0", features = ["rt-multi-thread", "macros"] }
