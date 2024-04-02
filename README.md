@@ -134,7 +134,7 @@ The library is able to support`no_std` and is designed for efficient usage with 
 Minimum supported Rust
 ---
 
-streambed-rs requires a minimum of Rust version 1.70.0 stable (June 2023), but the most recent stable version of Rust is recommended.
+This library requires a minimum of Rust version 1.75.0 stable (December 2023), but the most recent stable version of Rust is recommended.
 
 Contribution policy
 ---
