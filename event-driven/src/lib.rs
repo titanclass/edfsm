@@ -27,13 +27,13 @@ pub use event_driven_macros::impl_fsm;
 /// commands.
 pub trait Fsm {
     /// The state managed by the FSM
-    type S: Send;
+    type S;
     /// The command(s) that are able to be processed by the FSM
-    type C: Send;
+    type C;
     /// The event emitted having performed a command
-    type E: Send;
+    type E;
     /// The side effect handler
-    type SE: Send;
+    type SE;
 
     /// Given a state and command, optionally emit an event. Can perform async side
     /// effects along the way. This function is generally only called from the
@@ -42,7 +42,7 @@ pub trait Fsm {
         s: &Self::S,
         c: Self::C,
         se: &mut Self::SE,
-    ) -> impl Future<Output = Option<Self::E>> + Send;
+    ) -> impl Future<Output = Option<Self::E>>;
 
     /// Given a state and event, modify state, which could indicate transition to
     /// the next state. No side effects are to be performed. Can be used to replay
@@ -51,7 +51,7 @@ pub trait Fsm {
 
     /// Optional effect on entering a state i.e. transitioning in to state `S` from
     /// another.
-    fn on_entry(_s: &Self::S, _se: &mut Self::SE) -> impl Future<Output = ()> + Send;
+    fn on_entry(_s: &Self::S, _se: &mut Self::SE) -> impl Future<Output = ()>;
 
     /// This is the main entry point to the event driven FSM.
     /// Runs the state machine for a command, optionally performing effects,
@@ -61,7 +61,7 @@ pub trait Fsm {
         s: &mut Self::S,
         c: Self::C,
         se: &mut Self::SE,
-    ) -> impl Future<Output = Option<Self::E>> + Send {
+    ) -> impl Future<Output = Option<Self::E>> {
         async {
             let e = Self::for_command(s, c, se).await;
             if let Some(e) = &e {

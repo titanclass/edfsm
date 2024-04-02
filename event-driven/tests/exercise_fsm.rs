@@ -36,7 +36,7 @@ enum Output {
 // For more information: https://doc.rust-lang.org/nomicon/exotic-sizes.html#:~:text=Rust%20supports%20Dynamically%20Sized%20Types,DSTs%20are%20not%20normal%20types.
 
 trait EffectHandlers {
-    fn say_hi(&self) -> impl Future<Output = ()> + Send;
+    fn say_hi(&self) -> impl Future<Output = ()>;
 }
 
 struct EffectHandlerBox<SE: EffectHandlers + ?Sized>(SE);
@@ -48,7 +48,7 @@ struct MyFsm<SE: EffectHandlers> {
 }
 
 #[impl_fsm]
-impl<SE: EffectHandlers + Send> Fsm for MyFsm<SE> {
+impl<SE: EffectHandlers> Fsm for MyFsm<SE> {
     type S = State;
     type C = Input;
     type E = Output;
