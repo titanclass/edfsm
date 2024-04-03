@@ -55,15 +55,16 @@ pub trait Fsm {
     /// `step` function.
     fn for_command(s: &Self::S, c: Self::C, se: &mut Self::SE) -> Option<Self::E>;
 
-    /// Given a state and event, can perform side effects. This function is generally only
-    /// called from the `step` function.
-    fn for_event(s: &Self::S, e: &Self::E, se: &mut Self::SE);
-
     /// Given a state and event, modify state, which could indicate transition to
     /// the next state. No side effects are to be performed. Can be used to replay
     /// events to attain a new state i.e. the major function of event sourcing.
     /// Returns true if there is a state transition.
     fn on_event(s: &mut Self::S, e: &Self::E) -> OnEvent;
+
+    /// Given a state and event having been applied and either a transition or update
+    /// on state ("a change"), we can perform side effects.
+    /// This function is generally only called from the `step` function.
+    fn on_change(s: &Self::S, e: &Self::E, se: &mut Self::SE);
 
     /// Optional effect on entering a state i.e. transitioning in to state `S` from
     /// another.
@@ -74,9 +75,9 @@ pub trait Fsm {
     /// possibly producing an event and possibly transitioning to a new state. Also
     /// applies any "Entry/" processing when arriving at a new state.
     fn step(s: &mut Self::S, st: Step<Self::C, Self::E>, se: &mut Self::SE) -> Option<Self::E> {
-        let (e, step_event) = match st {
-            Step::Command(c) => (Self::for_command(s, c, se), false),
-            Step::Event(e) => (Some(e), true),
+        let e = match st {
+            Step::Command(c) => Self::for_command(s, c, se),
+            Step::Event(e) => Some(e),
         };
         if let Some(e) = e {
             let r = Self::on_event(s, &e);
@@ -84,9 +85,7 @@ pub trait Fsm {
                 Self::on_entry(s, se);
             };
             if let OnEvent::TransitionedState | OnEvent::UpdatedState = r {
-                if step_event {
-                    Self::for_event(s, &e, se);
-                }
+                Self::on_change(s, &e, se);
                 Some(e)
             } else {
                 None
@@ -170,10 +169,10 @@ mod tests {
                 }
             }
 
-            fn for_event(s: &State, e: &Event, se: &mut EffectHandlers) {
+            fn on_change(s: &State, e: &Event, se: &mut EffectHandlers) {
                 match (s, e) {
-                    (State::Idle(s), Event::Stopped(e)) => Self::for_idle_stopped(s, e, se),
-                    (State::Running(s), Event::Started(e)) => Self::for_running_started(s, e, se),
+                    (State::Idle(s), Event::Stopped(e)) => Self::on_idle_stopped(s, e, se),
+                    (State::Running(s), Event::Started(e)) => Self::on_running_started(s, e, se),
                     _ => (),
                 }
             }
@@ -214,13 +213,12 @@ mod tests {
             fn for_running_stop(
                 _s: &Running,
                 _c: Stop,
-                se: &mut EffectHandlers,
+                _se: &mut EffectHandlers,
             ) -> Option<Stopped> {
-                se.stop_something();
                 Some(Stopped)
             }
 
-            fn for_running_started(_s: &Running, _e: &Started, se: &mut EffectHandlers) {
+            fn on_running_started(_s: &Running, _e: &Started, se: &mut EffectHandlers) {
                 se.start_something();
             }
 
@@ -228,17 +226,16 @@ mod tests {
                 Some(Idle)
             }
 
-            fn for_idle_start(_s: &Idle, _c: Start, se: &mut EffectHandlers) -> Option<Started> {
-                se.start_something();
+            fn for_idle_start(_s: &Idle, _c: Start, _se: &mut EffectHandlers) -> Option<Started> {
                 Some(Started)
-            }
-
-            fn for_idle_stopped(_s: &Idle, _e: &Stopped, se: &mut EffectHandlers) {
-                se.stop_something();
             }
 
             fn on_idle_started(_s: &Idle, _e: &Started) -> Option<Running> {
                 Some(Running)
+            }
+
+            fn on_idle_stopped(_s: &Idle, _e: &Stopped, se: &mut EffectHandlers) {
+                se.stop_something();
             }
         }
 
