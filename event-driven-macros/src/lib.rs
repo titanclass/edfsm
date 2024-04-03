@@ -15,6 +15,7 @@ use syn::parse2;
 /// #[impl_fsm]
 /// impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
 ///     state!(Running / entry);
+///     state!(Running / exit);
 ///
 ///     transition!(Idle    => Start => Started => Running);
 ///     transition!(Running => Stop  => Stopped => Idle);
@@ -30,7 +31,7 @@ use syn::parse2;
 /// required to implement these methods e.g.:
 ///
 /// ```compile_fail
-/// async fn on_entry_running(_old_s: &Running, _se: &mut EffectHandlers) {
+/// fn on_exit_running(_old_s: &Running, _se: &mut EffectHandlers) {
 ///     // Do something
 /// }
 /// ```
@@ -44,7 +45,7 @@ use syn::parse2;
 /// In our example, for the first transition, multiple methods will be called that the developer must provide e.g.:
 ///
 /// ```compile_fail
-/// async fn for_idle_start(_s: &Idle, _c: Start, _se: &mut EffectHandlers) -> Option<Started> {
+/// fn for_idle_start(_s: &Idle, _c: Start, _se: &mut EffectHandlers) -> Option<Started> {
 ///     // Perform some effect here if required. Effects are performed via the EffectHandler
 ///     Some(Started)
 /// }

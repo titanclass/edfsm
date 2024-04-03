@@ -1,6 +1,4 @@
 [workspace]
-resolver = "2"
-rust-version = "1.75.0"
 
 members = [
     "event-driven",
