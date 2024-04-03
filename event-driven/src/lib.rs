@@ -15,14 +15,10 @@ pub enum Step<C, E> {
     Event(E),
 }
 
-/// The result of performing an on_event function in terms of
-/// how state has been affected. The distinction between an
-/// update and transition is made by the application. A transition
-/// will cause a `Fsm::on_entry handler`` to be invoked.
-pub enum OnEvent {
-    TransitionedState,
-    UnchangedState,
-    UpdatedState,
+/// Describes a type of state change that `on_event` can perform.
+pub enum Change {
+    Transitioned,
+    Updated,
 }
 
 /// Describes the behavior of a Finite State Machine (FSM) that can receive commands and produce
@@ -59,16 +55,12 @@ pub trait Fsm {
     /// the next state. No side effects are to be performed. Can be used to replay
     /// events to attain a new state i.e. the major function of event sourcing.
     /// Returns true if there is a state transition.
-    fn on_event(s: &mut Self::S, e: &Self::E) -> OnEvent;
+    fn on_event(s: &mut Self::S, e: &Self::E) -> Option<Change>;
 
-    /// Given a state and event having been applied and either a transition or update
-    /// on state ("a change"), we can perform side effects.
+    /// Given a state and event having been applied then handle any potential change
+    /// and optionally perform side effects.
     /// This function is generally only called from the `step` function.
-    fn on_change(s: &Self::S, e: &Self::E, se: &mut Self::SE);
-
-    /// Optional effect on entering a state i.e. transitioning in to state `S` from
-    /// another.
-    fn on_entry(_s: &Self::S, _se: &mut Self::SE) {}
+    fn on_change(s: &Self::S, e: &Self::E, se: &mut Self::SE, change: Change);
 
     /// This is the main entry point to the event driven FSM.
     /// Runs the state machine for a command or event, optionally performing effects,
@@ -81,11 +73,8 @@ pub trait Fsm {
         };
         if let Some(e) = e {
             let r = Self::on_event(s, &e);
-            if let OnEvent::TransitionedState = r {
-                Self::on_entry(s, se);
-            };
-            if let OnEvent::TransitionedState | OnEvent::UpdatedState = r {
-                Self::on_change(s, &e, se);
+            if let Some(c) = r {
+                Self::on_change(s, &e, se, c);
                 Some(e)
             } else {
                 None
@@ -169,15 +158,25 @@ mod tests {
                 }
             }
 
-            fn on_change(s: &State, e: &Event, se: &mut EffectHandlers) {
-                match (s, e) {
-                    (State::Idle(s), Event::Stopped(e)) => Self::on_idle_stopped(s, e, se),
-                    (State::Running(s), Event::Started(e)) => Self::on_running_started(s, e, se),
-                    _ => (),
+            fn on_change(s: &State, e: &Event, se: &mut EffectHandlers, change: Change) {
+                if let Change::Transitioned = change {
+                    // Let's implement this optional function to show how entry/exit
+                    // processing can be achieved, and also confirm that our FSM is
+                    // calling it.
+                    if let State::Running(s) = s {
+                        Self::on_entry_running(s, e, se)
+                    }
+                    match (s, e) {
+                        (State::Idle(s), Event::Stopped(e)) => Self::on_idle_stopped(s, e, se),
+                        (State::Running(s), Event::Started(e)) => {
+                            Self::on_running_started(s, e, se)
+                        }
+                        _ => (),
+                    }
                 }
             }
 
-            fn on_event(mut s: &mut State, e: &Event) -> OnEvent {
+            fn on_event(mut s: &mut State, e: &Event) -> Option<Change> {
                 let new_s = match (&mut s, e) {
                     (State::Running(s), Event::Stopped(e)) => {
                         Self::on_running_stopped(s, e).map(State::Idle)
@@ -189,24 +188,15 @@ mod tests {
                 };
                 if let Some(new_s) = new_s {
                     *s = new_s;
-                    OnEvent::TransitionedState
+                    Some(Change::Transitioned)
                 } else {
-                    OnEvent::UnchangedState
-                }
-            }
-
-            // Let's implement this optional function to show how entry/exit
-            // processing can be achieved, and also confirm that our FSM is
-            // calling it.
-            fn on_entry(new_s: &State, se: &mut EffectHandlers) {
-                if let State::Running(s) = new_s {
-                    Self::on_entry_running(s, se)
+                    None
                 }
             }
         }
 
         impl MyFsm {
-            fn on_entry_running(_to_s: &Running, se: &mut EffectHandlers) {
+            fn on_entry_running(_to_s: &Running, _e: &Event, se: &mut EffectHandlers) {
                 se.enter_running()
             }
 
