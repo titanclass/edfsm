@@ -158,6 +158,24 @@ mod tests {
                 }
             }
 
+            fn on_event(mut s: &mut State, e: &Event) -> Option<Change> {
+                let r = match (&mut s, e) {
+                    (State::Running(s), Event::Stopped(e)) => Self::on_running_stopped(s, e)
+                        .map(|new_s| (Change::Transitioned, Some(State::Idle(new_s)))),
+                    (State::Idle(s), Event::Started(e)) => Self::on_idle_started(s, e)
+                        .map(|new_s| (Change::Transitioned, Some(State::Running(new_s)))),
+                    _ => None,
+                };
+                if let Some((c, new_s)) = r {
+                    if let Some(new_s) = new_s {
+                        *s = new_s;
+                    }
+                    Some(c)
+                } else {
+                    None
+                }
+            }
+
             fn on_change(s: &State, e: &Event, se: &mut EffectHandlers, change: Change) {
                 if let Change::Transitioned = change {
                     // Let's implement this optional function to show how entry/exit
@@ -166,31 +184,11 @@ mod tests {
                     if let State::Running(s) = s {
                         Self::on_entry_running(s, e, se)
                     }
-                    match (s, e) {
-                        (State::Idle(s), Event::Stopped(e)) => Self::on_idle_stopped(s, e, se),
-                        (State::Running(s), Event::Started(e)) => {
-                            Self::on_running_started(s, e, se)
-                        }
-                        _ => (),
-                    }
                 }
-            }
-
-            fn on_event(mut s: &mut State, e: &Event) -> Option<Change> {
-                let new_s = match (&mut s, e) {
-                    (State::Running(s), Event::Stopped(e)) => {
-                        Self::on_running_stopped(s, e).map(State::Idle)
-                    }
-                    (State::Idle(s), Event::Started(e)) => {
-                        Self::on_idle_started(s, e).map(State::Running)
-                    }
-                    _ => None,
-                };
-                if let Some(new_s) = new_s {
-                    *s = new_s;
-                    Some(Change::Transitioned)
-                } else {
-                    None
+                match (s, e) {
+                    (State::Idle(s), Event::Stopped(e)) => Self::on_idle_stopped(s, e, se),
+                    (State::Running(s), Event::Started(e)) => Self::on_running_started(s, e, se),
+                    _ => (),
                 }
             }
         }
