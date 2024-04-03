@@ -35,7 +35,7 @@ pub trait Fsm {
 
     /// Given a state and command, optionally emit an event. Can perform side
     /// effects along the way. This function is generally only called from the
-    /// `run` function.
+    /// `step` function.
     fn for_command(s: &Self::S, c: Self::C, se: &mut Self::SE) -> Option<Self::E>;
 
     /// Given a state and event, modify state, which could indicate transition to
