@@ -1,13 +1,14 @@
 edfsm - Event Driven Finite State Machine
 ===
 
-Event driven Finite State Machines process commands (possibly created by other
+Event driven Finite State Machines process commands and events (possibly created by other
 events), possibly performing some side effect, and possibly emitting events.
 
-Commands are processed against a provided state. Events can be applied to states
-to yield new states.
+In one scenario, commands are processed against a provided state. Events can be applied to states
+to yield new states. This is known as a [Mealy](https://en.wikipedia.org/wiki/Mealy_machine) state machine. For more background: [Event-driven Finite State Machines](http://christopherhunt-software.blogspot.com/2021/02/event-driven-finite-state-machines.html).
 
-For more background: [Event-driven Finite State Machines](http://christopherhunt-software.blogspot.com/2021/02/event-driven-finite-state-machines.html).
+In another scenario, events are applied to a provided state. This is known as a [Moore](https://en.wikipedia.org/wiki/Moore_machine)
+state machine.
 
 DSL
 ---
