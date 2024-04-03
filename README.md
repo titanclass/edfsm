@@ -10,6 +10,19 @@ to yield new states. This is known as a [Mealy](https://en.wikipedia.org/wiki/Me
 In another scenario, events are applied to a provided state. This is known as a [Moore](https://en.wikipedia.org/wiki/Moore_machine)
 state machine.
 
+Why use state machines in general?
+---
+
+State machines help you ask the question, what commands or events should I be able process for the current state I'm in...
+They help you model complexity.
+
+Why edfsm?
+---
+
+edfsm, and its DSL in particular, help you identify the functions required to handle commands and events given
+declared states, and strongly type their declarations. In short, edfsm is designed to enhance the code quality 
+of your state machine by leveraging the compiler to assert what your declaration of it.
+
 DSL
 ---
 
