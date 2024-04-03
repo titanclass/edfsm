@@ -43,7 +43,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         let handler = format_ident!("on_entry_{}", state);
         let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
         entry_matches.push(quote!(
-            #state_enum::#state(s) => Self::#handler(s, se).await,
+            #state_enum::#state(s) => Self::#handler(s, se),
         ));
     }
 
@@ -77,13 +77,13 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             if let Some(event) = event {
                 command_matches.push(quote!(
                     (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).await.map(#event_enum::#event)
+                        Self::#command_handler(s, c, se).map(#event_enum::#event)
                     }
                 ));
             } else {
                 command_matches.push(quote!(
                     (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).await;
+                        Self::#command_handler(s, c, se);
                         None
                     }
                 ));
@@ -93,13 +93,13 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             if let Some(event) = event {
                 command_matches.push(quote!(
                     (_, #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).await.map(#event_enum::#event)
+                        Self::#command_handler(s, c, se).map(#event_enum::#event)
                     }
                 ));
             } else {
                 command_matches.push(quote!(
                     (_, #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).await;
+                        Self::#command_handler(s, c, se);
                         None
                     }
                 ));
@@ -203,7 +203,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         ))
         .unwrap(),
         parse2::<ImplItem>(quote!(
-            async fn for_command(
+            fn for_command(
                 s: &#state_enum,
                 c: #command_enum,
                 se: &mut #effect_handlers,
@@ -233,7 +233,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         ))
         .unwrap(),
         parse2::<ImplItem>(quote!(
-            async fn on_entry(new_s: &#state_enum, se: &mut #effect_handlers) {
+            fn on_entry(new_s: &#state_enum, se: &mut #effect_handlers) {
                 match new_s {
                     #( #entry_matches )*
                     _ => {}
