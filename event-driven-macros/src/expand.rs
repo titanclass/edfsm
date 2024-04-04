@@ -114,13 +114,13 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                     if to_state_explicit {
                         event_matches.push(quote!(
                             (#state_enum::#from_state(s), #event_enum::#event(e)) => {
-                                Self::#event_handler(s, e).map(#state_enum::#to_state)
+                                Self::#event_handler(s, e).map(|new_s| (edfsm::Change::Transitioned, Some(#state_enum::#to_state(new_s))))
                             }
                         ));
                     } else {
                         event_matches.push(quote!(
                             (#state_enum::#from_state(s), #event_enum::#event(e)) => {
-                                Self::#event_handler(s, e)
+                                Self::#event_handler(s, e).map(|_| (edfsm::Change::Updated, None))
                             }
                         ));
                     }
@@ -131,13 +131,13 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                 if to_state_explicit {
                     event_matches.push(quote!(
                         (s, #event_enum::#event(e)) => {
-                            Self::#event_handler(s, e).map(#state_enum::#to_state)
+                            Self::#event_handler(s, e).map(|new_s| (edfsm::Change::Transitioned, Some(#state_enum::#to_state(new_s))))
                         }
                     ));
                 } else {
                     event_matches.push(quote!(
                         (s, #event_enum::#event(e)) => {
-                            Self::#event_handler(s, e)
+                            Self::#event_handler(s, e).map(|_| (edfsm::Change::Updated, None))
                         }
                     ));
                 }
@@ -148,7 +148,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                 event_matches.push(quote!(
                     (#state_enum::#from_state(s), #event_enum::#event(e)) => {
                         Self::#event_handler(s, e);
-                        None
+                        Some((edfsm::Change::Updated, None))
                     }
                 ));
             }
@@ -159,7 +159,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                 event_matches.push(quote!(
                     (s, #event_enum::#event(e)) => {
                         Self::#event_handler(s, e);
-                        None
+                        Some((edfsm::Change::Updated, None))
                     }
                 ));
             }
@@ -218,25 +218,29 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             fn on_event(
                 mut s: &mut #state_enum,
                 e: &#event_enum,
-            ) -> bool {
-                let new_s = match (&mut s, e) {
+            ) -> Option<edfsm::Change> {
+                let r = match (&mut s, e) {
                     #( #event_matches )*
                     _ => None,
                 };
-                if let Some(new_s) = new_s {
-                    *s = new_s;
-                    true
+                if let Some((c, new_s)) = r {
+                    if let Some(new_s) = new_s {
+                        *s = new_s;
+                    }
+                    Some(c)
                 } else {
-                    false
+                    None
                 }
             }
         ))
         .unwrap(),
         parse2::<ImplItem>(quote!(
-            fn on_entry(new_s: &#state_enum, se: &mut #effect_handlers) {
-                match new_s {
-                    #( #entry_matches )*
-                    _ => {}
+            fn on_change(new_s: &#state_enum, e: &#event_enum, se: &mut #effect_handlers, change: edfsm::Change) {
+                if let edfsm::Change::Transitioned = change {
+                    match new_s {
+                        #( #entry_matches )*
+                        _ => {}
+                    }
                 }
             }
         ))

@@ -1,6 +1,6 @@
 // Declare our state, commands and events
 
-use edfsm::{impl_fsm, Fsm};
+use edfsm::{impl_fsm, Fsm, Step};
 
 struct Idle;
 struct Running;
@@ -101,25 +101,41 @@ fn main() {
 
     // Finally, test the FSM by stepping through various states
 
-    let e = MyFsm::step(&mut State::Idle(Idle), Command::Start(Start), &mut se);
+    let e = MyFsm::step(
+        &mut State::Idle(Idle),
+        Step::Command(Command::Start(Start)),
+        &mut se,
+    );
     assert!(matches!(e, Some(Event::Started(Started))));
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 0);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
-    let e = MyFsm::step(&mut State::Running(Running), Command::Start(Start), &mut se);
+    let e = MyFsm::step(
+        &mut State::Running(Running),
+        Step::Command(Command::Start(Start)),
+        &mut se,
+    );
     assert!(e.is_none());
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 0);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
-    let e = MyFsm::step(&mut State::Running(Running), Command::Stop(Stop), &mut se);
+    let e = MyFsm::step(
+        &mut State::Running(Running),
+        Step::Command(Command::Stop(Stop)),
+        &mut se,
+    );
     assert!(matches!(e, Some(Event::Stopped(Stopped))));
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 1);
     assert_eq!(se.transitioned_stopped_to_started, 1);
 
-    let e = MyFsm::step(&mut State::Idle(Idle), Command::Stop(Stop), &mut se);
+    let e = MyFsm::step(
+        &mut State::Idle(Idle),
+        Step::Command(Command::Stop(Stop)),
+        &mut se,
+    );
     assert!(e.is_none());
     assert_eq!(se.started, 1);
     assert_eq!(se.stopped, 1);
