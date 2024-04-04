@@ -59,6 +59,7 @@ impl<SE: EffectHandlers> Fsm for MyFsm<SE> {
     transition!(A => I0 => O0 => B);
     transition!(B => I1 => O1 => A | B);
     transition!(B => I2 => O2);
+    transition!(B => _ => O2);
     transition!(B => I3);
 
     transition!(_ => I1 => O1 => A);

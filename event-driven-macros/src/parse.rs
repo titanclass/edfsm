@@ -213,6 +213,7 @@ mod tests {
                 transition!(Uninitialised  => GenerateRootKey => RootKeyGenerated => SsInitialised);
                 transition!(SsInitialised  => GenerateVpnKey  => VpnKeyGenerated  => VpnInitialised);
                 transition!(VpnInitialised => SetCredentials  => CredentialsSet   => Configurable);
+                transition!(VpnInitialised => _               => CredentialsSet   => Configurable);
                 transition!(_              => GetUsername);
                 transition!(_              => Reset           => FactoryReset     => Uninitialised);
                 transition!(_              => Reset           => SoftReset        => VpnInitialised);
@@ -245,6 +246,10 @@ mod tests {
                 .unwrap(),
                 parse2(
                     quote!(VpnInitialised => SetCredentials  => CredentialsSet   => Configurable)
+                )
+                .unwrap(),
+                parse2(
+                    quote!(VpnInitialised => _               => CredentialsSet   => Configurable)
                 )
                 .unwrap(),
                 parse2(quote!(_              => GetUsername)).unwrap(),

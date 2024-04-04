@@ -49,6 +49,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
 
     let mut command_matches = Vec::with_capacity(fsm.transitions.len());
     let mut event_matches = Vec::with_capacity(fsm.transitions.len());
+    let change_matches: Vec<TokenStream> = Vec::with_capacity(fsm.transitions.len()); // TODO: no explicit type - and make mut
 
     for t in &fsm.transitions {
         let from_state = if let Type::Infer(_) = t.from_state {
@@ -56,7 +57,11 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         } else {
             Some(ident_from_type(&t.from_state)?)
         };
-        let command = ident_from_type(&t.command)?;
+        let command = if let Type::Infer(_) = t.command {
+            None
+        } else {
+            Some(ident_from_type(&t.command)?)
+        };
         let event = if let Some(event) = &t.event {
             Some(ident_from_type(event)?)
         } else {
@@ -72,37 +77,40 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             (None, false)
         };
 
-        if let Some(from_state) = from_state {
-            let command_handler = lowercase_ident(&format_ident!("for_{}_{}", from_state, command));
-            if let Some(event) = event {
-                command_matches.push(quote!(
-                    (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).map(#event_enum::#event)
-                    }
-                ));
+        if let Some(command) = command {
+            if let Some(from_state) = from_state {
+                let command_handler =
+                    lowercase_ident(&format_ident!("for_{}_{}", from_state, command));
+                if let Some(event) = event {
+                    command_matches.push(quote!(
+                        (#state_enum::#from_state(s), #command_enum::#command(c)) => {
+                            Self::#command_handler(s, c, se).map(#event_enum::#event)
+                        }
+                    ));
+                } else {
+                    command_matches.push(quote!(
+                        (#state_enum::#from_state(s), #command_enum::#command(c)) => {
+                            Self::#command_handler(s, c, se);
+                            None
+                        }
+                    ));
+                }
             } else {
-                command_matches.push(quote!(
-                    (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se);
-                        None
-                    }
-                ));
-            }
-        } else {
-            let command_handler = lowercase_ident(&format_ident!("for_any_{}", command));
-            if let Some(event) = event {
-                command_matches.push(quote!(
-                    (_, #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).map(#event_enum::#event)
-                    }
-                ));
-            } else {
-                command_matches.push(quote!(
-                    (_, #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se);
-                        None
-                    }
-                ));
+                let command_handler = lowercase_ident(&format_ident!("for_any_{}", command));
+                if let Some(event) = event {
+                    command_matches.push(quote!(
+                        (_, #command_enum::#command(c)) => {
+                            Self::#command_handler(s, c, se).map(#event_enum::#event)
+                        }
+                    ));
+                } else {
+                    command_matches.push(quote!(
+                        (_, #command_enum::#command(c)) => {
+                            Self::#command_handler(s, c, se);
+                            None
+                        }
+                    ));
+                }
             }
         }
 
@@ -241,6 +249,10 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                         #( #entry_matches )*
                         _ => {}
                     }
+                }
+                match (new_s, e) {
+                    #( #change_matches )*
+                    _ => (),
                 }
             }
         ))
