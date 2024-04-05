@@ -3,7 +3,8 @@ use std::mem;
 use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
-    parse2, Error, Ident, ImplItem, ImplItemMacro, ImplItemType, ItemImpl, Result, Token, Type,
+    parse2, token, Error, Ident, ImplItem, ImplItemMacro, ImplItemType, ItemImpl, Result, Token,
+    Type,
 };
 
 #[derive(Debug, Eq, PartialEq)]
@@ -56,11 +57,11 @@ pub struct Transition {
 impl Parse for Transition {
     fn parse(input: ParseStream) -> Result<Self> {
         let from_state = input.parse()?;
-        input.parse::<Token![=>]>()?;
+        input.parse::<token::FatArrow>()?;
         let command = input.parse()?;
-        let (event, to_state) = if input.parse::<Token![=>]>().is_ok() {
+        let (event, to_state) = if input.parse::<token::FatArrow>().is_ok() {
             let event = Some(input.parse()?);
-            let to_state = if input.parse::<Token![=>]>().is_ok() {
+            let to_state = if input.parse::<token::FatArrow>().is_ok() {
                 Some(input.parse()?)
             } else {
                 None
@@ -87,7 +88,7 @@ pub struct Ignore {
 impl Parse for Ignore {
     fn parse(input: ParseStream) -> Result<Self> {
         let from_state = input.parse()?;
-        input.parse::<Token![=>]>()?;
+        input.parse::<token::FatArrow>()?;
         let command = input.parse()?;
         Ok(Self {
             from_state,
