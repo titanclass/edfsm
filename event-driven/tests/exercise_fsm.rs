@@ -59,7 +59,7 @@ impl<SE: EffectHandlers> Fsm for MyFsm<SE> {
     transition!(A => I0 => O0 => B);
     transition!(B => I1 => O1 => A | B);
     transition!(B => I2 => O2);
-    transition!(B => _ => O2);
+    transition!(B => _  => O2);
     transition!(B => I3);
 
     transition!(_ => I1 => O1 => A);
@@ -94,6 +94,8 @@ impl<SE: EffectHandlers> MyFsm<SE> {
     }
 
     fn on_b_o2(_s: &B, _e: &O2) {}
+
+    fn on_change_b_o2(_s: &B, _e: &O2, _se: &mut EffectHandlerBox<SE>) {}
 
     fn for_b_i3(_s: &B, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
 

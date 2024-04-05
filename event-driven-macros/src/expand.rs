@@ -49,7 +49,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
 
     let mut command_matches = Vec::with_capacity(fsm.transitions.len());
     let mut event_matches = Vec::with_capacity(fsm.transitions.len());
-    let change_matches: Vec<TokenStream> = Vec::with_capacity(fsm.transitions.len()); // TODO: no explicit type - and make mut
+    let mut change_matches = Vec::with_capacity(fsm.transitions.len());
 
     for t in &fsm.transitions {
         let from_state = if let Type::Infer(_) = t.from_state {
@@ -114,6 +114,21 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             }
         }
 
+        let mut push_change_matches_conditionally = |to_state, event| {
+            if command.is_none() {
+                let change_handler = if let Some(to_state) = to_state {
+                    lowercase_ident(&format_ident!("on_change_{}_{}", to_state, event))
+                } else {
+                    lowercase_ident(&format_ident!("on_change_any_{}", event))
+                };
+                change_matches.push(quote!(
+                    (#state_enum::#to_state(s), #event_enum::#event(e)) => {
+                        Self::#change_handler(s, e, se)
+                    }
+                ));
+            }
+        };
+
         if let Some(to_state) = to_state {
             if let Some(from_state) = from_state {
                 if let Some(event) = event {
@@ -132,6 +147,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                             }
                         ));
                     }
+                    push_change_matches_conditionally(Some(to_state), event);
                 }
             } else {
                 let event = event.unwrap(); // Logic error if no event given a to_state.
@@ -149,6 +165,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                         }
                     ));
                 }
+                push_change_matches_conditionally(Some(to_state), event);
             };
         } else if let Some(from_state) = from_state {
             if let Some(event) = event {
@@ -159,6 +176,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                         Some((edfsm::Change::Updated, None))
                     }
                 ));
+                push_change_matches_conditionally(Some(from_state), event);
             }
         } else {
             // from and to states are None
@@ -170,6 +188,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                         Some((edfsm::Change::Updated, None))
                     }
                 ));
+                push_change_matches_conditionally(from_state, event);
             }
         }
     }
