@@ -56,17 +56,19 @@ impl<SE: EffectHandlers> Fsm for MyFsm<SE> {
 
     state!(B / entry);
 
-    transition!(A => I0 => O0 => B);
-    transition!(B => I1 => O1 => A | B);
-    transition!(B => I2 => O2);
-    transition!(B => _  => O2);
-    transition!(B => I3);
+    command_step!(A => I0 => O0 => B);
+    command_step!(B => I1 => O1 => A | B);
+    command_step!(B => I2 => O2);
+    event_step!(  B       => O2);
+    command_step!(B => I3);
 
-    transition!(_ => I1 => O1 => A);
-    transition!(_ => I2 => O2);
-    transition!(_ => I3);
+    command_step!(_ => I1 => O1 => A);
+    command_step!(_ => I2 => O2);
+    command_step!(_ => I3);
 
-    ignore!(B => I0);
+    ignore_event!(  A => O2);
+    ignore_command!(B => I0);
+    ignore_event!(  B => O0);
 }
 
 impl<SE: EffectHandlers> MyFsm<SE> {

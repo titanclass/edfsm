@@ -58,11 +58,11 @@ impl Fsm for MyFsm {
 
     state!(Running / entry);
 
-    transition!(Idle    => Start => Started => Running);
-    transition!(Running => Stop  => Stopped => Idle);
+    command_step!(Idle    => Start => Started => Running);
+    command_step!(Running => Stop  => Stopped => Idle);
 
-    ignore!(Idle    => Stop);
-    ignore!(Running => Start);
+    ignore_command!(Idle    => Stop);
+    ignore_command!(Running => Start);
 }
 
 impl MyFsm {

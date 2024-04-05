@@ -47,27 +47,27 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         ));
     }
 
-    let mut command_matches = Vec::with_capacity(fsm.transitions.len());
-    let mut event_matches = Vec::with_capacity(fsm.transitions.len());
-    let mut change_matches = Vec::with_capacity(fsm.transitions.len());
+    let mut command_matches = Vec::with_capacity(fsm.steps.len());
+    let mut event_matches = Vec::with_capacity(fsm.steps.len());
+    let mut change_matches = Vec::with_capacity(fsm.steps.len());
 
-    for t in &fsm.transitions {
-        let from_state = if let Type::Infer(_) = t.from_state {
+    for s in &fsm.steps {
+        let from_state = if let Type::Infer(_) = s.from_state() {
             None
         } else {
-            Some(ident_from_type(&t.from_state)?)
+            Some(ident_from_type(s.from_state())?)
         };
-        let command = if let Type::Infer(_) = t.command {
-            None
+        let command = if let Some(command) = s.command() {
+            Some(ident_from_type(command)?)
         } else {
-            Some(ident_from_type(&t.command)?)
+            None
         };
-        let event = if let Some(event) = &t.event {
+        let event = if let Some(event) = s.event() {
             Some(ident_from_type(event)?)
         } else {
             None
         };
-        let (to_state, to_state_explicit) = if let Some(to_state) = &t.to_state {
+        let (to_state, to_state_explicit) = if let Some(to_state) = s.to_state() {
             match to_state.states.as_slice() {
                 [single_type] => (Some(ident_from_type(single_type)?), true),
                 [first_type, ..] => (Some(ident_from_type(first_type)?), false),
@@ -115,7 +115,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         }
 
         let mut push_change_matches_conditionally = |to_state, event| {
-            if command.is_none() {
+            if s.on_change() {
                 let change_handler = if let Some(to_state) = to_state {
                     lowercase_ident(&format_ident!("on_change_{}_{}", to_state, event))
                 } else {
@@ -193,22 +193,53 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         }
     }
 
-    for i in &fsm.ignores {
-        let from_state = if let Type::Infer(_) = i.from_state {
-            None
-        } else {
-            Some(ident_from_type(&i.from_state)?)
-        };
-        let command = ident_from_type(&i.command)?;
+    if fsm.ignore_commands.is_empty() {
+        command_matches.push(quote!(
+            _ => None,
+        ));
+    } else {
+        for i in &fsm.ignore_commands {
+            let from_state = if let Type::Infer(_) = i.from_state {
+                None
+            } else {
+                Some(ident_from_type(&i.from_state)?)
+            };
+            let command = ident_from_type(&i.command)?;
 
-        if let Some(from_state) = from_state {
-            command_matches.push(quote!(
-                (#state_enum::#from_state(s), #command_enum::#command(c)) => None,
-            ));
-        } else {
-            command_matches.push(quote!(
-                (_, #command_enum::#command(c)) => None,
-            ));
+            if let Some(from_state) = from_state {
+                command_matches.push(quote!(
+                    (#state_enum::#from_state(s), #command_enum::#command(_)) => None,
+                ));
+            } else {
+                command_matches.push(quote!(
+                    (_, #command_enum::#command(_)) => None,
+                ));
+            }
+        }
+    }
+
+    if fsm.ignore_events.is_empty() {
+        event_matches.push(quote!(
+            _ => None,
+        ));
+    } else {
+        for i in &fsm.ignore_events {
+            let from_state = if let Type::Infer(_) = i.from_state {
+                None
+            } else {
+                Some(ident_from_type(&i.from_state)?)
+            };
+            let event = ident_from_type(&i.event)?;
+
+            if let Some(from_state) = from_state {
+                event_matches.push(quote!(
+                    (#state_enum::#from_state(s), #event_enum::#event(_)) => None,
+                ));
+            } else {
+                event_matches.push(quote!(
+                    (_, #event_enum::#event(_)) => None,
+                ));
+            }
         }
     }
 
@@ -248,7 +279,6 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             ) -> Option<edfsm::Change> {
                 let r = match (&mut s, e) {
                     #( #event_matches )*
-                    _ => None,
                 };
                 if let Some((c, new_s)) = r {
                     if let Some(new_s) = new_s {

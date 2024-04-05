@@ -45,11 +45,11 @@ impl Fsm for MyFsm {
 
     state!(Running / entry);
 
-    transition!(Idle    => Start => Started => Running);
-    transition!(Running => Stop  => Stopped => Idle);
+    command_step!(Idle    => Start => Started => Running);
+    command_step!(Running => Stop  => Stopped => Idle);
 
-    ignore!(Idle    => Stop);
-    ignore!(Running => Start);
+    ignore_command!(Idle    => Stop);
+    ignore_command!(Running => Start);
 }
 ```
 
@@ -64,13 +64,15 @@ fn on_entry_running(_old_s: &Running, _se: &mut EffectHandlers) {
 }
 ```
 
-The `transition!` macro declares an entire transition using the form:
+The `command_step!` macro declares what should happen given a command using the form:
 
 ```
-<from-state> => <given-command> [=> <yields-event> []=> <to-state>]]
+<from-state> => <given-command> [=> <yields-event> [=> <to-state>]]
 ```
 
-In our example, for the first transition, multiple methods will be called that the developer must provide e.g.:
+> When declaring staets it is also possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
+
+In our example, for the first step declaration, multiple methods will be called that the developer must provide e.g.:
 
 ```rust
 fn for_idle_start(_s: &Idle, _c: Start, _se: &mut EffectHandlers) -> Option<Started> {
@@ -83,13 +85,21 @@ fn on_idle_started(_s: &Idle, _e: &Started) -> Option<Running> {
 }
 ```
 
-The `ignore!` macro describes those states and commands that should be ignored given:
+> Note that step declarations may also be provided for events using a `event_step!` macro (not shown). The form then becomes:
+> 
+> ```
+> <from-state> => <given-event> [=> <to-state>]
+> ```
+
+The `ignore_command!` macro describes those states and commands that should be ignored given:
 
 ```
 <from-state> => <given-command>
 ```
 
-It is possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
+> Note if no `ignore_command!` declarations are provided then exhaustive matching on states and commands is not enforced.
+
+> There is a `ignore_event!` macro available for ignoring events where events are driving the steps.
 
 State machines are then advanced given a mutable state and command. An optional event can be
 emitted along with a possible state transition e.g.:
@@ -116,13 +126,13 @@ a finer granularity of state with its fields, and so we wish to update them dire
 For example, given our previous representation of:
 
 ```rust
-transition!(Running => Stop  => Stopped => Idle);
+command_step!(Running => Stop  => Stopped => Idle);
 ```
 
 ...if we change it to:
 
 ```rust
-transition!(Running => Stop  => Stopped);
+command_step!(Running => Stop  => Stopped);
 ```
 
 i.e. if we remove the target state, then the associated function will be able to mutate the
