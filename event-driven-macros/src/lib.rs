@@ -16,8 +16,8 @@ use syn::parse2;
 /// impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
 ///     state!(Running / entry);
 ///
-///     command_step!(Idle    => Start => Started => Running);
-///     command_step!(Running => Stop  => Stopped => Idle);
+///     command!(Idle    => Start => Started => Running);
+///     command!(Running => Stop  => Stopped => Idle);
 ///
 ///     ignore_command!(Idle    => Stop);
 ///     ignore_command!(Running => Start);
@@ -35,7 +35,7 @@ use syn::parse2;
 /// }
 /// ```
 ///
-/// The `command_step!` macro declares an entire transition using the form:
+/// The `command!` macro declares an entire transition using the form:
 ///
 /// ```compile_fail
 /// <from-state> => <given-command> [=> <yields-event> []=> <to-state>]]
@@ -62,7 +62,7 @@ use syn::parse2;
 ///
 /// It is possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
 ///
-/// There are similar macros for events e.g. `event_step!` and `ignore_event`.
+/// There are similar macros for events e.g. `event!` and `ignore_event`.
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn impl_fsm(input: TokenStream, annotated_item: TokenStream) -> TokenStream {

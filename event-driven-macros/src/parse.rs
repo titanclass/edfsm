@@ -194,7 +194,7 @@ pub struct Fsm {
     pub event_enum: Type,
     pub effect_handlers: Type,
     pub entry_handlers: Vec<Entry>,
-    pub steps: Vec<Box<dyn Step>>,
+    pub inputs: Vec<Box<dyn Step>>,
     pub ignore_commands: Vec<IgnoreCommand>,
     pub ignore_events: Vec<IgnoreEvent>,
     pub item_impl: ItemImpl,
@@ -211,7 +211,7 @@ impl Parse for Fsm {
         let mut event_enum = None;
         let mut effect_handlers = None;
         let mut entry_handlers = vec![];
-        let mut steps = vec![];
+        let mut inputs = vec![];
         let mut ignore_commands = vec![];
         let mut ignore_events = vec![];
 
@@ -244,11 +244,12 @@ impl Parse for Fsm {
                         "state" => {
                             entry_handlers.push(parse2(mac.tokens)?);
                         }
-                        "command_step" => {
-                            steps.push(Box::new(parse2::<CommandStep>(mac.tokens)?) as Box<dyn Step>);
+                        "command" => {
+                            inputs.push(Box::new(parse2::<CommandStep>(mac.tokens)?) as Box<dyn Step>);
                         }
-                        "event_step" => {
-                            steps.push(Box::new(parse2::<EventStep>(mac.tokens)?) as Box<dyn Step>);
+                        "event" => {
+                            inputs
+                                .push(Box::new(parse2::<EventStep>(mac.tokens)?) as Box<dyn Step>);
                         }
                         "ignore_command" => {
                             ignore_commands.push(parse2::<IgnoreCommand>(mac.tokens)?);
@@ -257,7 +258,7 @@ impl Parse for Fsm {
                             ignore_events.push(parse2::<IgnoreEvent>(mac.tokens)?);
                         }
                         n => {
-                            return Err(Error::new_spanned(mac, format!("Unknown macro: `{n}!`. Use only `state!`, `command_step!`, `event_step!`, `ignore_command!` and `ignore_event!` macros here.")));
+                            return Err(Error::new_spanned(mac, format!("Unknown macro: `{n}!`. Use only `state!`, `command!`, `event!`, `ignore_command!` and `ignore_event!` macros here.")));
                         }
                     }
                 }
@@ -278,7 +279,7 @@ impl Parse for Fsm {
                 event_enum,
                 effect_handlers,
                 entry_handlers,
-                steps,
+                inputs,
                 ignore_commands,
                 ignore_events,
                 item_impl,

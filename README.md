@@ -45,8 +45,8 @@ impl Fsm for MyFsm {
 
     state!(Running / entry);
 
-    command_step!(Idle    => Start => Started => Running);
-    command_step!(Running => Stop  => Stopped => Idle);
+    command!(Idle    => Start => Started => Running);
+    command!(Running => Stop  => Stopped => Idle);
 
     ignore_command!(Idle    => Stop);
     ignore_command!(Running => Start);
@@ -64,7 +64,7 @@ fn on_entry_running(_old_s: &Running, _se: &mut EffectHandlers) {
 }
 ```
 
-The `command_step!` macro declares what should happen given a command using the form:
+The `command!` macro declares what should happen given a command using the form:
 
 ```
 <from-state> => <given-command> [=> <yields-event> [=> <to-state>]]
@@ -85,7 +85,7 @@ fn on_idle_started(_s: &Idle, _e: &Started) -> Option<Running> {
 }
 ```
 
-> Note that step declarations may also be provided for events using a `event_step!` macro (not shown). The form then becomes:
+> Note that inputs may also be provided as events using a `event!` macro (not shown). The form then becomes:
 > 
 > ```
 > <from-state> => <given-event> [=> <to-state>]
@@ -99,7 +99,7 @@ The `ignore_command!` macro describes those states and commands that should be i
 
 > Note if no `ignore_command!` declarations are provided then exhaustive matching on states and commands is not enforced.
 
-> There is a `ignore_event!` macro available for ignoring events where events are driving the steps.
+> There is a `ignore_event!` macro available for ignoring events where events are providing the input.
 
 State machines are then advanced given a mutable state and command. An optional event can be
 emitted along with a possible state transition e.g.:
@@ -126,13 +126,13 @@ a finer granularity of state with its fields, and so we wish to update them dire
 For example, given our previous representation of:
 
 ```rust
-command_step!(Running => Stop  => Stopped => Idle);
+command!(Running => Stop  => Stopped => Idle);
 ```
 
 ...if we change it to:
 
 ```rust
-command_step!(Running => Stop  => Stopped);
+command!(Running => Stop  => Stopped);
 ```
 
 i.e. if we remove the target state, then the associated function will be able to mutate the

@@ -66,8 +66,8 @@ pub trait Fsm {
     /// Runs the state machine for a command or event, optionally performing effects,
     /// possibly producing an event and possibly transitioning to a new state. Also
     /// applies any "Entry/" processing when arriving at a new state.
-    fn step(s: &mut Self::S, st: Input<Self::C, Self::E>, se: &mut Self::SE) -> Option<Self::E> {
-        let e = match st {
+    fn step(s: &mut Self::S, i: Input<Self::C, Self::E>, se: &mut Self::SE) -> Option<Self::E> {
+        let e = match i {
             Input::Command(c) => Self::for_command(s, c, se),
             Input::Event(e) => Some(e),
         };

@@ -58,8 +58,8 @@ impl Fsm for MyFsm {
 
     state!(Running / entry);
 
-    command_step!(Idle    => Start => Started => Running);
-    command_step!(Running => Stop  => Stopped => Idle);
+    command!(Idle    => Start => Started => Running);
+    command!(Running => Stop  => Stopped => Idle);
 
     ignore_command!(Idle    => Stop);
     ignore_command!(Running => Start);
