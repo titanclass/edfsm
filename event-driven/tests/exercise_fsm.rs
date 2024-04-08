@@ -87,8 +87,8 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(O1)
     }
 
-    fn on_b_o1(_s: &B, _e: &O1) -> (Change, Option<State>) {
-        (Change::Updated, Some(State::A(A)))
+    fn on_b_o1(_s: &B, _e: &O1) -> Option<(Change, Option<State>)> {
+        Some((Change::Updated, Some(State::A(A))))
     }
 
     fn for_b_i2(_s: &B, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {

@@ -149,7 +149,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                         )),
                         Ordering::Greater => event_matches.push(quote!(
                             (#state_enum::#from_state(s), #event_enum::#event(e)) => {
-                                Some(Self::#event_handler(s, e))
+                                Self::#event_handler(s, e)
                             }
                         )),
                     }
@@ -171,7 +171,7 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                     )),
                     Ordering::Greater => event_matches.push(quote!(
                         (s, #event_enum::#event(e)) => {
-                            Some(Self::#event_handler(s, e))
+                            Self::#event_handler(s, e)
                         }
                     )),
                 }
