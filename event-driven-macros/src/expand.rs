@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use proc_macro2::TokenStream;
 use quote::__private::ext::RepToTokensExt;
 use quote::format_ident;
@@ -67,14 +69,14 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         } else {
             None
         };
-        let (to_state, to_state_explicit) = if let Some(to_state) = s.to_state() {
+        let (to_state, to_state_num) = if let Some(to_state) = s.to_state() {
             match to_state.states.as_slice() {
-                [single_type] => (Some(ident_from_type(single_type)?), true),
-                [first_type, ..] => (Some(ident_from_type(first_type)?), false),
+                [single_type] => (Some(ident_from_type(single_type)?), 1),
+                [first_type, ..] => (Some(ident_from_type(first_type)?), to_state.states.len()),
                 _ => panic!("There must be at least one element"),
             }
         } else {
-            (None, false)
+            (None, 0)
         };
 
         if let Some(command) = command {
@@ -134,36 +136,44 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                 if let Some(event) = event {
                     let event_handler =
                         lowercase_ident(&format_ident!("on_{}_{}", from_state, event));
-                    if to_state_explicit {
-                        event_matches.push(quote!(
-                            (#state_enum::#from_state(s), #event_enum::#event(e)) => {
-                                Self::#event_handler(s, e).map(|new_s| (edfsm::Change::Transitioned, Some(#state_enum::#to_state(new_s))))
-                            }
-                        ));
-                    } else {
-                        event_matches.push(quote!(
+                    match to_state_num.cmp(&1) {
+                        Ordering::Less => event_matches.push(quote!(
                             (#state_enum::#from_state(s), #event_enum::#event(e)) => {
                                 Self::#event_handler(s, e).map(|_| (edfsm::Change::Updated, None))
                             }
-                        ));
+                        )),
+                        Ordering::Equal => event_matches.push(quote!(
+                            (#state_enum::#from_state(s), #event_enum::#event(e)) => {
+                                Self::#event_handler(s, e).map(|new_s| (edfsm::Change::Transitioned, Some(#state_enum::#to_state(new_s))))
+                            }
+                        )),
+                        Ordering::Greater => event_matches.push(quote!(
+                            (#state_enum::#from_state(s), #event_enum::#event(e)) => {
+                                Some(Self::#event_handler(s, e))
+                            }
+                        )),
                     }
                     push_change_matches_conditionally(Some(to_state), event);
                 }
             } else {
                 let event = event.unwrap(); // Logic error if no event given a to_state.
                 let event_handler = lowercase_ident(&format_ident!("on_any_{}", event));
-                if to_state_explicit {
-                    event_matches.push(quote!(
-                        (s, #event_enum::#event(e)) => {
-                            Self::#event_handler(s, e).map(|new_s| (edfsm::Change::Transitioned, Some(#state_enum::#to_state(new_s))))
-                        }
-                    ));
-                } else {
-                    event_matches.push(quote!(
+                match to_state_num.cmp(&1) {
+                    Ordering::Less => event_matches.push(quote!(
                         (s, #event_enum::#event(e)) => {
                             Self::#event_handler(s, e).map(|_| (edfsm::Change::Updated, None))
                         }
-                    ));
+                    )),
+                    Ordering::Equal => event_matches.push(quote!(
+                        (s, #event_enum::#event(e)) => {
+                            Self::#event_handler(s, e).map(|new_s| (edfsm::Change::Transitioned, Some(#state_enum::#to_state(new_s))))
+                        }
+                    )),
+                    Ordering::Greater => event_matches.push(quote!(
+                        (s, #event_enum::#event(e)) => {
+                            Some(Self::#event_handler(s, e))
+                        }
+                    )),
                 }
                 push_change_matches_conditionally(Some(to_state), event);
             };
