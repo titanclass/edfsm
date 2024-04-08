@@ -109,7 +109,7 @@ let mut s = State::Idle(Idle);
 let c = Command::Start(Start);
 // Now step the state machine with the state and command,
 // and, an (undeclared) effect handler.
-let (e, t) = MyFsm::step(&mut s, Step::Command(c), &mut se);
+let (e, t) = MyFsm::step(&mut s, Input::Command(c), &mut se);
 ```
 
 State can also be re-constituted by replaying events. If there is no transition to an entirely

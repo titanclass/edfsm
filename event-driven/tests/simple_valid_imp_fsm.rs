@@ -1,6 +1,6 @@
 // Declare our state, commands and events
 
-use edfsm::{impl_fsm, Fsm, Step};
+use edfsm::{impl_fsm, Fsm, Input};
 
 struct Idle;
 struct Running;
@@ -103,7 +103,7 @@ fn main() {
 
     let e = MyFsm::step(
         &mut State::Idle(Idle),
-        Step::Command(Command::Start(Start)),
+        Input::Command(Command::Start(Start)),
         &mut se,
     );
     assert!(matches!(e, Some(Event::Started(Started))));
@@ -113,7 +113,7 @@ fn main() {
 
     let e = MyFsm::step(
         &mut State::Running(Running),
-        Step::Command(Command::Start(Start)),
+        Input::Command(Command::Start(Start)),
         &mut se,
     );
     assert!(e.is_none());
@@ -123,7 +123,7 @@ fn main() {
 
     let e = MyFsm::step(
         &mut State::Running(Running),
-        Step::Command(Command::Stop(Stop)),
+        Input::Command(Command::Stop(Stop)),
         &mut se,
     );
     assert!(matches!(e, Some(Event::Stopped(Stopped))));
@@ -133,7 +133,7 @@ fn main() {
 
     let e = MyFsm::step(
         &mut State::Idle(Idle),
-        Step::Command(Command::Stop(Stop)),
+        Input::Command(Command::Stop(Stop)),
         &mut se,
     );
     assert!(e.is_none());

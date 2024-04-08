@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use edfsm::{impl_fsm, Fsm, Step};
+use edfsm::{impl_fsm, Fsm, Input};
 
 struct A;
 struct B;
@@ -15,7 +15,7 @@ struct I0;
 struct I1;
 struct I2;
 struct I3;
-enum Input {
+enum Command {
     I0(I0),
     I1(I1),
     I2(I2),
@@ -25,7 +25,7 @@ enum Input {
 struct O0;
 struct O1;
 struct O2;
-enum Output {
+enum Event {
     O0(O0),
     O1(O1),
     O2(O2),
@@ -50,8 +50,8 @@ struct MyFsm<SE: EffectHandlers> {
 #[impl_fsm]
 impl<SE: EffectHandlers> Fsm for MyFsm<SE> {
     type S = State;
-    type C = Input;
-    type E = Output;
+    type C = Command;
+    type E = Event;
     type SE = EffectHandlerBox<SE>;
 
     state!(B / entry);
@@ -128,8 +128,8 @@ fn main() {
     }
     let mut se = EffectHandlerBox(MyEffectHandlers);
 
-    let _ = MyFsm::step(&mut State::A(A), Step::Command(Input::I0(I0)), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Step::Command(Input::I1(I1)), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Step::Command(Input::I2(I2)), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Step::Command(Input::I3(I3)), &mut se);
+    let _ = MyFsm::step(&mut State::A(A), Input::Command(Command::I0(I0)), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Input::Command(Command::I1(I1)), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Input::Command(Command::I2(I2)), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Input::Command(Command::I3(I3)), &mut se);
 }
