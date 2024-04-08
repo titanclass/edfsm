@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use edfsm::{impl_fsm, Fsm, Input};
+use edfsm::{impl_fsm, Fsm};
 
 struct A;
 struct B;
@@ -128,8 +128,8 @@ fn main() {
     }
     let mut se = EffectHandlerBox(MyEffectHandlers);
 
-    let _ = MyFsm::step(&mut State::A(A), Input::Command(Command::I0(I0)), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Input::Command(Command::I1(I1)), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Input::Command(Command::I2(I2)), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Input::Command(Command::I3(I3)), &mut se);
+    let _ = MyFsm::step(&mut State::A(A), Command::I0(I0), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Command::I1(I1), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Command::I2(I2), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Command::I3(I3), &mut se);
 }
