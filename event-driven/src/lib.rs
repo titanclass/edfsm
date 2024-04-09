@@ -1,4 +1,4 @@
-#![doc = include_str!("../../README.md")]
+#![doc = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/../README.md"))]
 #![no_std]
 
 pub use event_driven_macros::impl_fsm;
