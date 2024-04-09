@@ -49,11 +49,12 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         ));
     }
 
-    let mut command_matches = Vec::with_capacity(fsm.inputs.len());
-    let mut event_matches = Vec::with_capacity(fsm.inputs.len());
-    let mut change_matches = Vec::with_capacity(fsm.inputs.len());
+    let steps_len = fsm.steps.len();
+    let mut command_matches = Vec::with_capacity(steps_len);
+    let mut event_matches = Vec::with_capacity(steps_len);
+    let mut change_matches = Vec::with_capacity(steps_len);
 
-    for s in &fsm.inputs {
+    for s in &fsm.steps {
         let from_state = if let Type::Infer(_) = s.from_state() {
             None
         } else {

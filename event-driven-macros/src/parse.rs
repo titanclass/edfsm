@@ -194,7 +194,7 @@ pub struct Fsm {
     pub event_enum: Type,
     pub effect_handlers: Type,
     pub entry_handlers: Vec<Entry>,
-    pub inputs: Vec<Box<dyn Step>>,
+    pub steps: Vec<Box<dyn Step>>,
     pub ignore_commands: Vec<IgnoreCommand>,
     pub ignore_events: Vec<IgnoreEvent>,
     pub item_impl: ItemImpl,
@@ -211,7 +211,7 @@ impl Parse for Fsm {
         let mut event_enum = None;
         let mut effect_handlers = None;
         let mut entry_handlers = vec![];
-        let mut inputs = vec![];
+        let mut steps = vec![];
         let mut ignore_commands = vec![];
         let mut ignore_events = vec![];
 
@@ -245,11 +245,10 @@ impl Parse for Fsm {
                             entry_handlers.push(parse2(mac.tokens)?);
                         }
                         "command" => {
-                            inputs.push(Box::new(parse2::<CommandStep>(mac.tokens)?) as Box<dyn Step>);
+                            steps.push(Box::new(parse2::<CommandStep>(mac.tokens)?) as Box<dyn Step>);
                         }
                         "event" => {
-                            inputs
-                                .push(Box::new(parse2::<EventStep>(mac.tokens)?) as Box<dyn Step>);
+                            steps.push(Box::new(parse2::<EventStep>(mac.tokens)?) as Box<dyn Step>);
                         }
                         "ignore_command" => {
                             ignore_commands.push(parse2::<IgnoreCommand>(mac.tokens)?);
@@ -279,7 +278,7 @@ impl Parse for Fsm {
                 event_enum,
                 effect_handlers,
                 entry_handlers,
-                inputs,
+                steps,
                 ignore_commands,
                 ignore_events,
                 item_impl,
