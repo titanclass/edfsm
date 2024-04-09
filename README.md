@@ -1,14 +1,14 @@
 edfsm - Event Driven Finite State Machine
 ===
 
-Event driven Finite State Machines process commands and events (possibly created by other
-events), possibly performing some side effect, and possibly emitting events.
+An Event Driven Finite State Machine is a useful formalism for control and monitoring applications.  The key concepts are:
 
-In one scenario, commands are processed against a provided state. Events can be applied to states
-to yield new states. This is known as a [Mealy](https://en.wikipedia.org/wiki/Mealy_machine) state machine. For more background: [Event-driven Finite State Machines](http://christopherhunt-software.blogspot.com/2021/02/event-driven-finite-state-machines.html).
+- The _state_ maintained by the state machine represents aspects of its external environment and its history.   
+- An _event_ represents a change in the environment and is one form of input to the state machine.  Reception of an event may cause the state to be updated.
+- A _command_ is an input to the state machine that may cause it to perform an effect.  An event may also be produced by the command which may update the state.
+- An _effect_ is some action that influences the environment.  
 
-In another scenario, events are applied to a provided state. This is known as a [Moore](https://en.wikipedia.org/wiki/Moore_machine)
-state machine.
+The effect, if any, produced by a command will depend on both the command and the a-priori state.  This models the _proactive_ behaviour of a [Mealy](https://en.wikipedia.org/wiki/Mealy_machine) machine.  An effect may also be produced after and event is processed and it will depend on the a-posteriori state.  This models the _reactive_ behaviour of a [Moore](https://en.wikipedia.org/wiki/Moore_machine) machine.
 
 Why edfsm?
 ---
@@ -64,7 +64,7 @@ The `command!` macro declares what should happen given a command using the form:
 <from-state> => <given-command> [=> <yields-event> [=> <to-state>]]
 ```
 
-> When declaring staets it is also possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
+> When declaring states it is also possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
 
 In our example, for the first step declaration, multiple methods will be called that the developer must provide e.g.:
 
