@@ -1,13 +1,21 @@
 edfsm - Event Driven Finite State Machine
 ===
 
-Event driven Finite State Machines process commands (possibly created by other
-events), possibly performing some side effect, and possibly emitting events.
+An Event Driven Finite State Machine is a useful formalism for control and monitoring applications.  The key concepts are:
 
-Commands are processed against a provided state. Events can be applied to states
-to yield new states.
+- The _state_ maintained by the state machine represents aspects of its external environment and its history.   
+- An _event_ represents a change in the environment and is one form of input to the state machine.  Reception of an event may cause the state to be updated.
+- A _command_ is an input to the state machine that may cause it to perform an effect.  An event may also be produced by the command which may update the state.
+- An _effect_ is some action that influences the environment.  
 
-For more background: [Event-driven Finite State Machines](http://christopherhunt-software.blogspot.com/2021/02/event-driven-finite-state-machines.html).
+The effect, if any, produced by a command will depend on both the command and the a-priori state.  This models the _proactive_ behaviour of a [Mealy](https://en.wikipedia.org/wiki/Mealy_machine) machine.  An effect may also be produced after and event is processed and it will depend on the a-posteriori state.  This models the _reactive_ behaviour of a [Moore](https://en.wikipedia.org/wiki/Moore_machine) machine.
+
+Why edfsm?
+---
+
+edfsm, and its DSL in particular, help you identify the functions required to handle commands and events given
+declared states, and strongly type their declarations. In short, edfsm is designed to enhance the code quality 
+of your state machine by leveraging the compiler to assert your declaration of its transitions.
 
 DSL
 ---
@@ -19,7 +27,7 @@ state, command and event types are handled by the developer.
 
 Here is an example given the declaration of states, commands, events and an effect handler:
 
-```rust
+```rust,ignore
 struct MyFsm;
 
 #[impl_fsm]
@@ -31,11 +39,11 @@ impl Fsm for MyFsm {
 
     state!(Running / entry);
 
-    transition!(Idle    => Start => Started => Running);
-    transition!(Running => Stop  => Stopped => Idle);
+    command!(Idle    => Start => Started => Running);
+    command!(Running => Stop  => Stopped => Idle);
 
-    ignore!(Idle    => Stop);
-    ignore!(Running => Start);
+    ignore_command!(Idle    => Stop);
+    ignore_command!(Running => Start);
 }
 ```
 
@@ -44,21 +52,23 @@ handlers can be declared. In our example, the macro will ensure that a `on_entry
 method will be called for `MyFsm`. The developer is then
 required to implement these methods e.g.:
 
-```rust
+```rust,ignore
 fn on_entry_running(_old_s: &Running, _se: &mut EffectHandlers) {
     // Do something
 }
 ```
 
-The `transition!` macro declares an entire transition using the form:
+The `command!` macro declares what should happen given a command using the form:
 
+```compile_fail
+<from-state> => <given-command> [=> <yields-event> [=> <to-state>]]
 ```
-<from-state> => <given-command> [=> <yields-event> []=> <to-state>]]
-```
 
-In our example, for the first transition, multiple methods will be called that the developer must provide e.g.:
+> When declaring states it is also possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
 
-```rust
+In our example, for the first step declaration, multiple methods will be called that the developer must provide e.g.:
+
+```rust,ignore
 fn for_idle_start(_s: &Idle, _c: Start, _se: &mut EffectHandlers) -> Option<Started> {
     // Perform some effect here if required. Effects are performed via the EffectHandler
     Some(Started)
@@ -69,53 +79,63 @@ fn on_idle_started(_s: &Idle, _e: &Started) -> Option<Running> {
 }
 ```
 
-The `ignore!` macro describes those states and commands that should be ignored given:
+> Note that steps may also be declared for events using a `event!` macro (not shown). The form then becomes:
+> 
+> ```compile_fail
+> <from-state> => <given-event> [=> <to-state> [ / action]]
+> ```
+>
+> (`/ action` can be used to declare that a side-effect is to be performed)
 
-```
+The `ignore_command!` macro describes those states and commands that should be ignored given:
+
+```compile_fail
 <from-state> => <given-command>
 ```
 
-It is possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
+> Note if no `ignore_command!` declarations are provided then exhaustive matching on states and commands is not enforced.
+
+> There is a `ignore_event!` macro available for ignoring events where events are providing the input.
 
 State machines are then advanced given a mutable state and command. An optional event can be
 emitted along with a possible state transition e.g.:
 
-```rust
+```rust,ignore
 let mut s = State::Idle(Idle);
 let c = Command::Start(Start);
 // Now step the state machine with the state and command,
 // and, an (undeclared) effect handler.
-let (e, t) = MyFsm::step(&mut s, c, &mut se);
+let (e, t) = MyFsm::step(&mut s, Input::Command(c), &mut se);
 ```
 
 State can also be re-constituted by replaying events. If there is no transition to an entirely
 new state then the existing state may still have been updated.
 Here is an example of applying an event to state with the update of state
-if necessary and a bool of `t` indicating true if a transition occurred.
+if necessary and an option of `r` indicating some type of change that occurred, or `None` otherwise.
 
-```rust
-let t = MyFsm::on_event(&mut s, &e);
+```rust,ignore
+let r = MyFsm::on_event(&mut s, &e);
 ```
 
 Mutating state can be very useful where a state itself represents
 a finer granularity of state with its fields, and so we wish to update them directly. 
 For example, given our previous representation of:
 
-```rust
-transition!(Running => Stop  => Stopped => Idle);
+```rust,ignore
+command!(Running => Stop  => Stopped => Idle);
 ```
 
 ...if we change it to:
 
-```rust
-transition!(Running => Stop  => Stopped);
+```rust,ignore
+command!(Running => Stop  => Stopped);
 ```
 
 i.e. if we remove the target state, then the associated function will be able to mutate the
 state and no transition can be returned as they are mutually exclusive actions. Here is
-a sample signature in accordance with the above `transition`.
+a sample signature in accordance with the above `command!`.
 
-```rust
+```rust,ignore
 fn on_idle_started(s: &mut Idle, e: &Started) {
     // `s` can now be mutated given some `e`.
 }
@@ -138,4 +158,4 @@ Contributions via GitHub pull requests are gladly accepted from their original a
 
 This code is open source software licensed under the [Apache-2.0 license](./LICENSE).
 
-© Copyright [Titan Class P/L](https://www.titanclass.com.au/), 2022
+© Copyright [Titan Class P/L](https://www.titanclass.com.au/), 2022-2024

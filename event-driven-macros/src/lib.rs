@@ -15,28 +15,27 @@ use syn::parse2;
 /// #[impl_fsm]
 /// impl Fsm<State, Command, Event, EffectHandlers> for MyFsm {
 ///     state!(Running / entry);
-///     state!(Running / exit);
 ///
-///     transition!(Idle    => Start => Started => Running);
-///     transition!(Running => Stop  => Stopped => Idle);
+///     command!(Idle    => Start => Started => Running);
+///     command!(Running => Stop  => Stopped => Idle);
 ///
-///     ignore!(Idle    => Stop);
-///     ignore!(Running => Start);
+///     ignore_command!(Idle    => Stop);
+///     ignore_command!(Running => Start);
 /// }
 /// ```
 ///
-/// The `state!` macro declares state-related attributes. At this time, entry and exit
+/// The `state!` macro declares state-related attributes. At this time, only entry
 /// handlers can be declared. In our example, the macro will ensure that an `on_entry_running`
-/// and an `on_exit_running` method will be called for `MyFsm`. The developer is then
-/// required to implement these methods e.g.:
+/// method will be called for `MyFsm`. The developer is then
+/// required to implement a method e.g.:
 ///
 /// ```compile_fail
-/// fn on_exit_running(_old_s: &Running, _se: &mut EffectHandlers) {
+/// fn on_entry_running(_s: &Running, _se: &mut EffectHandlers) {
 ///     // Do something
 /// }
 /// ```
 ///
-/// The `transition!` macro declares an entire transition using the form:
+/// The `command!` macro declares an entire transition using the form:
 ///
 /// ```compile_fail
 /// <from-state> => <given-command> [=> <yields-event> []=> <to-state>]]
@@ -55,13 +54,23 @@ use syn::parse2;
 /// }
 /// ```
 ///
-/// The `ignore!` macro describes those states and commands that should be ignored given:
+/// The `ignore_command!` macro describes those states and commands that should be ignored given:
 ///
 /// ```compile_fail
 /// <from-state> => <given-command>
 /// ```
 ///
 /// It is possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
+///
+/// There are similar macros for events e.g. `event!` and `ignore_event`. For `event!`, the declaration
+/// becomes:
+///
+/// ```compile_fail
+/// <from-state> => <given-event> [=> <to-state> [ / action]]
+/// ```
+///
+/// The `/ action` is optional and is used to declare that a side-effect is to be performed.
+
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn impl_fsm(input: TokenStream, annotated_item: TokenStream) -> TokenStream {

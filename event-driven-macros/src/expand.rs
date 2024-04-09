@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+
 use proc_macro2::TokenStream;
 use quote::__private::ext::RepToTokensExt;
 use quote::format_ident;
@@ -47,100 +49,134 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
         ));
     }
 
-    let mut command_matches = Vec::with_capacity(fsm.transitions.len());
-    let mut event_matches = Vec::with_capacity(fsm.transitions.len());
+    let steps_len = fsm.steps.len();
+    let mut command_matches = Vec::with_capacity(steps_len);
+    let mut event_matches = Vec::with_capacity(steps_len);
+    let mut change_matches = Vec::with_capacity(steps_len);
 
-    for t in &fsm.transitions {
-        let from_state = if let Type::Infer(_) = t.from_state {
+    for s in &fsm.steps {
+        let from_state = if let Type::Infer(_) = s.from_state() {
             None
         } else {
-            Some(ident_from_type(&t.from_state)?)
+            Some(ident_from_type(s.from_state())?)
         };
-        let command = ident_from_type(&t.command)?;
-        let event = if let Some(event) = &t.event {
+        let command = if let Some(command) = s.command() {
+            Some(ident_from_type(command)?)
+        } else {
+            None
+        };
+        let event = if let Some(event) = s.event() {
             Some(ident_from_type(event)?)
         } else {
             None
         };
-        let (to_state, to_state_explicit) = if let Some(to_state) = &t.to_state {
+        let (to_state, to_state_num) = if let Some(to_state) = s.to_state() {
             match to_state.states.as_slice() {
-                [single_type] => (Some(ident_from_type(single_type)?), true),
-                [first_type, ..] => (Some(ident_from_type(first_type)?), false),
+                [single_type] => (Some(ident_from_type(single_type)?), 1),
+                [first_type, ..] => (Some(ident_from_type(first_type)?), to_state.states.len()),
                 _ => panic!("There must be at least one element"),
             }
         } else {
-            (None, false)
+            (None, 0)
         };
 
-        if let Some(from_state) = from_state {
-            let command_handler = lowercase_ident(&format_ident!("for_{}_{}", from_state, command));
-            if let Some(event) = event {
-                command_matches.push(quote!(
-                    (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).map(#event_enum::#event)
-                    }
-                ));
+        if let Some(command) = command {
+            if let Some(from_state) = from_state {
+                let command_handler =
+                    lowercase_ident(&format_ident!("for_{}_{}", from_state, command));
+                if let Some(event) = event {
+                    command_matches.push(quote!(
+                        (#state_enum::#from_state(s), #command_enum::#command(c)) => {
+                            Self::#command_handler(s, c, se).map(#event_enum::#event)
+                        }
+                    ));
+                } else {
+                    command_matches.push(quote!(
+                        (#state_enum::#from_state(s), #command_enum::#command(c)) => {
+                            Self::#command_handler(s, c, se);
+                            None
+                        }
+                    ));
+                }
             } else {
-                command_matches.push(quote!(
-                    (#state_enum::#from_state(s), #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se);
-                        None
-                    }
-                ));
-            }
-        } else {
-            let command_handler = lowercase_ident(&format_ident!("for_any_{}", command));
-            if let Some(event) = event {
-                command_matches.push(quote!(
-                    (_, #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se).map(#event_enum::#event)
-                    }
-                ));
-            } else {
-                command_matches.push(quote!(
-                    (_, #command_enum::#command(c)) => {
-                        Self::#command_handler(s, c, se);
-                        None
-                    }
-                ));
+                let command_handler = lowercase_ident(&format_ident!("for_any_{}", command));
+                if let Some(event) = event {
+                    command_matches.push(quote!(
+                        (_, #command_enum::#command(c)) => {
+                            Self::#command_handler(s, c, se).map(#event_enum::#event)
+                        }
+                    ));
+                } else {
+                    command_matches.push(quote!(
+                        (_, #command_enum::#command(c)) => {
+                            Self::#command_handler(s, c, se);
+                            None
+                        }
+                    ));
+                }
             }
         }
+
+        let mut push_change_matches_conditionally = |to_state, event| {
+            if s.on_change() {
+                let change_handler = if let Some(to_state) = to_state {
+                    lowercase_ident(&format_ident!("on_change_{}_{}", to_state, event))
+                } else {
+                    lowercase_ident(&format_ident!("on_change_any_{}", event))
+                };
+                change_matches.push(quote!(
+                    (#state_enum::#to_state(s), #event_enum::#event(e)) => {
+                        Self::#change_handler(s, e, se)
+                    }
+                ));
+            }
+        };
 
         if let Some(to_state) = to_state {
             if let Some(from_state) = from_state {
                 if let Some(event) = event {
                     let event_handler =
                         lowercase_ident(&format_ident!("on_{}_{}", from_state, event));
-                    if to_state_explicit {
-                        event_matches.push(quote!(
+                    match to_state_num.cmp(&1) {
+                        Ordering::Less => event_matches.push(quote!(
                             (#state_enum::#from_state(s), #event_enum::#event(e)) => {
-                                Self::#event_handler(s, e).map(#state_enum::#to_state)
+                                Self::#event_handler(s, e).map(|_| (edfsm::Change::Updated, None))
                             }
-                        ));
-                    } else {
-                        event_matches.push(quote!(
+                        )),
+                        Ordering::Equal => event_matches.push(quote!(
+                            (#state_enum::#from_state(s), #event_enum::#event(e)) => {
+                                Self::#event_handler(s, e).map(|new_s| (edfsm::Change::Transitioned, Some(#state_enum::#to_state(new_s))))
+                            }
+                        )),
+                        Ordering::Greater => event_matches.push(quote!(
                             (#state_enum::#from_state(s), #event_enum::#event(e)) => {
                                 Self::#event_handler(s, e)
                             }
-                        ));
+                        )),
                     }
+                    push_change_matches_conditionally(Some(to_state), event);
                 }
             } else {
                 let event = event.unwrap(); // Logic error if no event given a to_state.
                 let event_handler = lowercase_ident(&format_ident!("on_any_{}", event));
-                if to_state_explicit {
-                    event_matches.push(quote!(
+                match to_state_num.cmp(&1) {
+                    Ordering::Less => event_matches.push(quote!(
                         (s, #event_enum::#event(e)) => {
-                            Self::#event_handler(s, e).map(#state_enum::#to_state)
+                            Self::#event_handler(s, e).map(|_| (edfsm::Change::Updated, None))
                         }
-                    ));
-                } else {
-                    event_matches.push(quote!(
+                    )),
+                    Ordering::Equal => event_matches.push(quote!(
+                        (s, #event_enum::#event(e)) => {
+                            Self::#event_handler(s, e).map(|new_s| (edfsm::Change::Transitioned, Some(#state_enum::#to_state(new_s))))
+                        }
+                    )),
+                    Ordering::Greater => event_matches.push(quote!(
                         (s, #event_enum::#event(e)) => {
                             Self::#event_handler(s, e)
                         }
-                    ));
+                    )),
                 }
+                push_change_matches_conditionally(Some(to_state), event);
             };
         } else if let Some(from_state) = from_state {
             if let Some(event) = event {
@@ -148,9 +184,10 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                 event_matches.push(quote!(
                     (#state_enum::#from_state(s), #event_enum::#event(e)) => {
                         Self::#event_handler(s, e);
-                        None
+                        Some((edfsm::Change::Updated, None))
                     }
                 ));
+                push_change_matches_conditionally(Some(from_state), event);
             }
         } else {
             // from and to states are None
@@ -159,29 +196,61 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
                 event_matches.push(quote!(
                     (s, #event_enum::#event(e)) => {
                         Self::#event_handler(s, e);
-                        None
+                        Some((edfsm::Change::Updated, None))
                     }
+                ));
+                push_change_matches_conditionally(from_state, event);
+            }
+        }
+    }
+
+    if fsm.ignore_commands.is_empty() {
+        command_matches.push(quote!(
+            _ => None,
+        ));
+    } else {
+        for i in &fsm.ignore_commands {
+            let from_state = if let Type::Infer(_) = i.from_state {
+                None
+            } else {
+                Some(ident_from_type(&i.from_state)?)
+            };
+            let command = ident_from_type(&i.command)?;
+
+            if let Some(from_state) = from_state {
+                command_matches.push(quote!(
+                    (#state_enum::#from_state(s), #command_enum::#command(_)) => None,
+                ));
+            } else {
+                command_matches.push(quote!(
+                    (_, #command_enum::#command(_)) => None,
                 ));
             }
         }
     }
 
-    for i in &fsm.ignores {
-        let from_state = if let Type::Infer(_) = i.from_state {
-            None
-        } else {
-            Some(ident_from_type(&i.from_state)?)
-        };
-        let command = ident_from_type(&i.command)?;
+    if fsm.ignore_events.is_empty() {
+        event_matches.push(quote!(
+            _ => None,
+        ));
+    } else {
+        for i in &fsm.ignore_events {
+            let from_state = if let Type::Infer(_) = i.from_state {
+                None
+            } else {
+                Some(ident_from_type(&i.from_state)?)
+            };
+            let event = ident_from_type(&i.event)?;
 
-        if let Some(from_state) = from_state {
-            command_matches.push(quote!(
-                (#state_enum::#from_state(s), #command_enum::#command(c)) => None,
-            ));
-        } else {
-            command_matches.push(quote!(
-                (_, #command_enum::#command(c)) => None,
-            ));
+            if let Some(from_state) = from_state {
+                event_matches.push(quote!(
+                    (#state_enum::#from_state(s), #event_enum::#event(_)) => None,
+                ));
+            } else {
+                event_matches.push(quote!(
+                    (_, #event_enum::#event(_)) => None,
+                ));
+            }
         }
     }
 
@@ -218,25 +287,32 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
             fn on_event(
                 mut s: &mut #state_enum,
                 e: &#event_enum,
-            ) -> bool {
-                let new_s = match (&mut s, e) {
+            ) -> Option<edfsm::Change> {
+                let r = match (&mut s, e) {
                     #( #event_matches )*
-                    _ => None,
                 };
-                if let Some(new_s) = new_s {
-                    *s = new_s;
-                    true
+                if let Some((c, new_s)) = r {
+                    if let Some(new_s) = new_s {
+                        *s = new_s;
+                    }
+                    Some(c)
                 } else {
-                    false
+                    None
                 }
             }
         ))
         .unwrap(),
         parse2::<ImplItem>(quote!(
-            fn on_entry(new_s: &#state_enum, se: &mut #effect_handlers) {
-                match new_s {
-                    #( #entry_matches )*
-                    _ => {}
+            fn on_change(new_s: &#state_enum, e: &#event_enum, se: &mut #effect_handlers, change: edfsm::Change) {
+                if let edfsm::Change::Transitioned = change {
+                    match new_s {
+                        #( #entry_matches )*
+                        _ => {}
+                    }
+                }
+                match (new_s, e) {
+                    #( #change_matches )*
+                    _ => (),
                 }
             }
         ))

@@ -2,7 +2,7 @@
 
 use std::marker::PhantomData;
 
-use edfsm::{impl_fsm, Fsm};
+use edfsm::{impl_fsm, Change, Fsm, Input};
 
 struct A;
 struct B;
@@ -15,7 +15,7 @@ struct I0;
 struct I1;
 struct I2;
 struct I3;
-enum Input {
+enum Command {
     I0(I0),
     I1(I1),
     I2(I2),
@@ -25,7 +25,7 @@ enum Input {
 struct O0;
 struct O1;
 struct O2;
-enum Output {
+enum Event {
     O0(O0),
     O1(O1),
     O2(O2),
@@ -50,22 +50,25 @@ struct MyFsm<SE: EffectHandlers> {
 #[impl_fsm]
 impl<SE: EffectHandlers> Fsm for MyFsm<SE> {
     type S = State;
-    type C = Input;
-    type E = Output;
+    type C = Command;
+    type E = Event;
     type SE = EffectHandlerBox<SE>;
 
     state!(B / entry);
 
-    transition!(A => I0 => O0 => B);
-    transition!(B => I1 => O1 => A | B);
-    transition!(B => I2 => O2);
-    transition!(B => I3);
+    command!(A => I0 => O0 => B);
+    command!(B => I1 => O1 => A | B);
+    command!(B => I2 => O2);
+    event!(  B       => O2 / action);
+    command!(B => I3);
 
-    transition!(_ => I1 => O1 => A);
-    transition!(_ => I2 => O2);
-    transition!(_ => I3);
+    command!(_ => I1 => O1 => A);
+    command!(_ => I2 => O2);
+    command!(_ => I3);
 
-    ignore!(B => I0);
+    ignore_event!(  A => O2);
+    ignore_command!(B => I0);
+    ignore_event!(  B => O0);
 }
 
 impl<SE: EffectHandlers> MyFsm<SE> {
@@ -84,8 +87,8 @@ impl<SE: EffectHandlers> MyFsm<SE> {
         Some(O1)
     }
 
-    fn on_b_o1(_s: &B, _e: &O1) -> Option<State> {
-        Some(State::A(A))
+    fn on_b_o1(_s: &B, _e: &O1) -> Option<(Change, Option<State>)> {
+        Some((Change::Updated, Some(State::A(A))))
     }
 
     fn for_b_i2(_s: &B, _c: I2, _se: &mut EffectHandlerBox<SE>) -> Option<O2> {
@@ -93,6 +96,8 @@ impl<SE: EffectHandlers> MyFsm<SE> {
     }
 
     fn on_b_o2(_s: &B, _e: &O2) {}
+
+    fn on_change_b_o2(_s: &B, _e: &O2, _se: &mut EffectHandlerBox<SE>) {}
 
     fn for_b_i3(_s: &B, _c: I3, _se: &mut EffectHandlerBox<SE>) {}
 
@@ -123,8 +128,8 @@ fn main() {
     }
     let mut se = EffectHandlerBox(MyEffectHandlers);
 
-    let _ = MyFsm::step(&mut State::A(A), Input::I0(I0), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Input::I1(I1), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Input::I2(I2), &mut se);
-    let _ = MyFsm::step(&mut State::B(B), Input::I3(I3), &mut se);
+    let _ = MyFsm::step(&mut State::A(A), Input::Command(Command::I0(I0)), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Input::Command(Command::I1(I1)), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Input::Command(Command::I2(I2)), &mut se);
+    let _ = MyFsm::step(&mut State::B(B), Input::Command(Command::I3(I3)), &mut se);
 }
