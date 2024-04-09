@@ -1,10 +1,4 @@
-//! Event driven Finite State Machines process commands and events (possibly created by other
-//! events), performing some side effect, and emitting events.
-//! Commands are processed against a provided state. Events can be applied to states
-//! to yield new states.
-//!
-//! For more background on [Event-driven Finite State Machines](http://christopherhunt-software.blogspot.com/2021/02/event-driven-finite-state-machines.html).
-
+#![doc = include_str!("../../README.md")]
 #![no_std]
 
 pub use event_driven_macros::impl_fsm;
@@ -54,7 +48,7 @@ pub trait Fsm {
     /// Given a state and event, modify state, which could indicate transition to
     /// the next state. No side effects are to be performed. Can be used to replay
     /// events to attain a new state i.e. the major function of event sourcing.
-    /// Returns true if there is a state transition.
+    /// Returns some enumeration of the `Change` type if there is a state transition.
     fn on_event(s: &mut Self::S, e: &Self::E) -> Option<Change>;
 
     /// Given a state and event having been applied then handle any potential change
@@ -62,10 +56,11 @@ pub trait Fsm {
     /// This function is generally only called from the `step` function.
     fn on_change(s: &Self::S, e: &Self::E, se: &mut Self::SE, change: Change);
 
-    /// This is the main entry point to the event driven FSM.
+    /// This is the common entry point to the event driven FSM.
     /// Runs the state machine for a command input, optionally performing effects,
     /// possibly producing an event and possibly transitioning to a new state. Also
-    /// applies any "Entry/" processing when arriving at a new state.
+    /// applies any "Entry/" processing when arriving at a new state, and a change
+    /// handler if there is a state change.
     fn step(s: &mut Self::S, i: Input<Self::C, Self::E>, se: &mut Self::SE) -> Option<Self::E> {
         let e = match i {
             Input::Command(c) => Self::for_command(s, c, se),

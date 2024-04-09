@@ -24,10 +24,10 @@ use syn::parse2;
 /// }
 /// ```
 ///
-/// The `state!` macro declares state-related attributes. At this time, entry and exit
+/// The `state!` macro declares state-related attributes. At this time, only entry
 /// handlers can be declared. In our example, the macro will ensure that an `on_entry_running`
 /// method will be called for `MyFsm`. The developer is then
-/// required to implement these methods e.g.:
+/// required to implement a method e.g.:
 ///
 /// ```compile_fail
 /// fn on_entry_running(_s: &Running, _se: &mut EffectHandlers) {
@@ -62,7 +62,15 @@ use syn::parse2;
 ///
 /// It is possible to use a wildcard i.e. `_` in place of `<from-state>` and `<to-state>`.
 ///
-/// There are similar macros for events e.g. `event!` and `ignore_event`.
+/// There are similar macros for events e.g. `event!` and `ignore_event`. For `event!`, the declaration
+/// becomes:
+///
+/// ```compile_fail
+/// <from-state> => <given-event> [=> <to-state> [ / action]]
+/// ```
+///
+/// The `/ action` is optional and is used to declare that a side-effect is to be performed.
+
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn impl_fsm(input: TokenStream, annotated_item: TokenStream) -> TokenStream {
