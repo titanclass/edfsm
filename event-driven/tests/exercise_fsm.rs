@@ -59,7 +59,7 @@ impl<SE: EffectHandlers> Fsm for MyFsm<SE> {
     command!(A => I0 => O0 => B);
     command!(B => I1 => O1 => A | B);
     command!(B => I2 => O2);
-    event!(  B       => O2);
+    event!(  B       => O2 / action);
     command!(B => I3);
 
     command!(_ => I1 => O1 => A);

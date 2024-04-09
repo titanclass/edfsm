@@ -3,8 +3,7 @@ use std::mem;
 use quote::quote;
 use syn::{
     parse::{Parse, ParseStream},
-    parse2, token, Error, Ident, ImplItem, ImplItemMacro, ImplItemType, ItemImpl, Result, Token,
-    Type,
+    parse2, token, Error, Ident, ImplItem, ImplItemMacro, ImplItemType, ItemImpl, Result, Type,
 };
 
 pub struct Entry {
@@ -14,7 +13,7 @@ pub struct Entry {
 impl Parse for Entry {
     fn parse(input: ParseStream) -> Result<Self> {
         let state = input.parse()?;
-        input.parse::<Token![/]>()?;
+        input.parse::<token::Div>()?;
         let ident = input.parse::<Ident>()?;
         let ident_str = ident.to_string();
         if ident_str != "entry" {
@@ -35,7 +34,7 @@ impl Parse for TargetStates {
         loop {
             let target_type = input.parse()?;
             target_types.push(target_type);
-            if input.parse::<Token![|]>().is_err() {
+            if input.parse::<token::Or>().is_err() {
                 break;
             }
         }
@@ -113,6 +112,7 @@ pub struct EventStep {
     pub command: Option<Type>,
     pub event: Option<Type>,
     pub to_state: Option<TargetStates>,
+    pub on_change: bool,
 }
 
 impl Parse for EventStep {
@@ -120,16 +120,30 @@ impl Parse for EventStep {
         let from_state = input.parse()?;
         input.parse::<token::FatArrow>()?;
         let event = Some(input.parse()?);
-        let to_state = if input.parse::<token::FatArrow>().is_ok() {
+        let to_state = if input.peek(token::FatArrow) {
+            input.parse::<token::FatArrow>()?;
             Some(input.parse()?)
         } else {
             None
         };
+        let on_change = if input.peek(token::Div) {
+            input.parse::<token::Div>()?;
+            let ident = input.parse::<Ident>()?;
+            let ident_str = ident.to_string();
+            if ident_str != "action" {
+                return Err(Error::new_spanned(ident, format!("Unknown state qualifer: `/ {ident_str}`. Use only `/ action` to indicate there is going to be an action here.")));
+            };
+            true
+        } else {
+            false
+        };
+
         Ok(Self {
             from_state,
             command: None,
             event,
             to_state,
+            on_change,
         })
     }
 }
@@ -151,9 +165,8 @@ impl Step for EventStep {
         &self.to_state
     }
 
-    // FIXME: Implement /change for this instead - we probably don't want a change handler most of the time.
     fn on_change(&self) -> bool {
-        true
+        self.on_change
     }
 }
 
