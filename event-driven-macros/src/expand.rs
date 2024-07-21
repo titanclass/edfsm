@@ -9,7 +9,7 @@ use syn::Ident;
 use syn::Type;
 use syn::{parse2, Error, ImplItem, Result};
 
-use crate::parse::Fsm;
+use crate::parse::{Entry, Fsm};
 
 pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
     if let Some(trait_) = &fsm.item_impl.trait_ {
@@ -39,15 +39,15 @@ pub fn expand(fsm: &mut Fsm) -> Result<TokenStream> {
     let event_enum = &fsm.event_enum;
     let effect_handlers = &fsm.effect_handlers;
 
-    let mut entry_matches = Vec::with_capacity(fsm.entry_handlers.len());
-    for ee in &fsm.entry_handlers {
+    let entry_match_to_handler = | ee: &Entry | -> Result<TokenStream> {
         let state = ident_from_type(&ee.state)?;
         let handler = format_ident!("on_entry_{}", state);
         let handler = Ident::new(&handler.to_string().to_lowercase(), handler.span());
-        entry_matches.push(quote!(
+        Ok(quote!(
             #state_enum::#state(s) => Self::#handler(s, se),
-        ));
-    }
+        ))
+    };
+    let entry_matches: Vec<_> = fsm.entry_handlers.iter().map(entry_match_to_handler).collect::<Result<_>>()?;
 
     let steps_len = fsm.steps.len();
     let mut command_matches = Vec::with_capacity(steps_len);
