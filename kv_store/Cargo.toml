@@ -1,0 +1,7 @@
+[package]
+name = "kv_store"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+edfsm = { path = "../event-driven", version = "0.7.0" }
