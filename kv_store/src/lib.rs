@@ -1,20 +1,45 @@
 #![no_std]
 extern crate alloc;
 use alloc::{
+    boxed::Box,
     collections::{btree_map::Entry, BTreeMap},
     string::String,
     vec::Vec,
 };
+use core::{clone::Clone, ops::Bound};
 use edfsm::{Change, Fsm};
 
-/// A command to query or manage the KV store.
-#[derive(Debug, Clone)]
-pub enum Command {
-    GetAll,
-    GetRange,
-    Get,
-    Remove,
+/// A query to the KV store.
+///
+/// Type parameter `V` is the value type of the KV store. (The key type is `Path`.)
+/// The functions of type `RespondOne` and `RespondMany` are passed the query result.
+///
+/// Results contain borrowed values `&V` which can't be passed to channels or
+/// other data structures.  The repond function may clone these to pass them on,
+/// or the function may interpret or aggregate borrowed values in place.
+///
+pub enum Query<V> {
+    /// Get the value at the given path
+    Get(Path, RespondOne<V>),
+
+    /// Get the entries whose path starts with the given path,
+    /// including the entry for the path itself.
+    GetTree(Path, RespondMany<V>),
+
+    /// Get the entries in the given range
+    GetRange((Bound<Path>, Bound<Path>), RespondMany<V>),
+
+    /// Get all the entries
+    GetAll(RespondMany<V>),
+    // Can't implement a remove command because cammands can't directly alter state.
+    // Remove(Path, RespondOne<V>),
 }
+
+/// Type of a function that will respond to an iterator over query results.
+type RespondMany<V> = Box<dyn FnOnce(&dyn Iterator<Item = (&Path, &V)>)>;
+
+/// Type of a function that will respond to a single valued query response
+type RespondOne<V> = Box<dyn FnOnce(Option<&V>)>;
 
 /// `KvStore<M>` represents the collection of state machines of type `M`.
 ///
@@ -35,12 +60,25 @@ where
     M::E: Keyed,
 {
     type S = Self;
-    type C = Command;
+    type C = Query<M::S>;
     type E = M::E;
     type SE = M::SE;
 
-    fn for_command(_r: &Self::S, _c: Self::C, _se: &mut Self::SE) -> Option<Self::E> {
-        None // TODO!
+    fn for_command(store: &Self::S, command: Self::C, _se: &mut Self::SE) -> Option<Self::E> {
+        use Bound::*;
+        use Query::*;
+        match command {
+            Get(path, respond) => respond(store.0.get(&path)),
+            GetTree(path, respond) => respond(
+                &(store
+                    .0
+                    .range((Included(&path), Unbounded))
+                    .take_while(|(p, _)| p.len() > path.len() || *p == &path)),
+            ),
+            GetRange(bounds, respond) => respond(&store.0.range(bounds)),
+            GetAll(respond) => respond(&store.0.iter()),
+        }
+        None
     }
 
     fn on_event(r: &mut Self::S, e: &Self::E) -> Option<Change> {
@@ -71,6 +109,13 @@ pub trait Keyed {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug)]
 pub struct Path {
     items: Vec<PathItem>,
+}
+
+impl Path {
+    /// The length of this path.
+    pub fn len(&self) -> usize {
+        self.items.len()
+    }
 }
 
 /// One element of a `Path` can be a number or a name.
