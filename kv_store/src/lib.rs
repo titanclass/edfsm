@@ -9,7 +9,12 @@ use edfsm::{Change, Fsm};
 
 /// A command to query or manage the KV store.
 #[derive(Debug, Clone)]
-pub enum KvOperation {}
+pub enum Command {
+    GetAll,
+    GetRange,
+    Get,
+    Remove,
+}
 
 /// `KvStore<M>` represents the collection of state machines of type `M`.
 ///
@@ -30,12 +35,12 @@ where
     M::E: Keyed,
 {
     type S = Self;
-    type C = KvOperation;
+    type C = Command;
     type E = M::E;
     type SE = M::SE;
 
     fn for_command(_r: &Self::S, _c: Self::C, _se: &mut Self::SE) -> Option<Self::E> {
-        None
+        None // TODO!
     }
 
     fn on_event(r: &mut Self::S, e: &Self::E) -> Option<Change> {
@@ -48,7 +53,7 @@ where
     }
 
     fn on_change(r: &Self::S, e: &Self::E, se: &mut Self::SE, change: Change) {
-        let f = || {
+        let mut f = || {
             let s = r.0.get(&e.key()?)?;
             M::on_change(s, e, se, change);
             Some(())
