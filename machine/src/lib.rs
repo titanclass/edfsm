@@ -101,7 +101,7 @@ where
     ///
     /// This is an optional step before the machine is converted to a task.
     /// Remain effector-specific initialisation occurs in the task.
-    pub fn initial_events<'a>(&'a mut self) -> Hydrator<'a, M> {
+    pub fn initial_events(&mut self) -> Hydrator<M> {
         Hydrator {
             state: &mut self.state,
         }
@@ -174,7 +174,7 @@ where
     /// Access the sender side of the machine input channel
     pub fn sender(&self) -> &Sender<In<M>> {
         // Note: sender is always present when this method is accessable
-        &self.sender.as_ref().unwrap()
+        self.sender.as_ref().unwrap()
     }
 
     /// Convert this machine into a future that will run as a task
@@ -257,13 +257,11 @@ where
 {
     type Item = Event<M>;
 
-    fn notify(&mut self, a: Self::Item) -> impl std::future::Future<Output = Result<()>>
+    async fn notify(&mut self, a: Self::Item) -> Result<()>
     where
         Self::Item: Clone + 'static,
     {
-        async move {
-            M::on_event(self.state, &a);
-            Ok(())
-        }
+        M::on_event(self.state, &a);
+        Ok(())
     }
 }

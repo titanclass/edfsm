@@ -100,8 +100,8 @@ impl<A> Adapter for Discard<A> {
     type Item = A;
 
     /// Discard the item
-    fn notify(&mut self, _e: Self::Item) -> impl Future<Output = Result<()>> {
-        async { Ok(()) }
+    async fn notify(&mut self, _e: Self::Item) -> Result<()> {
+        Ok(())
     }
 
     /// Replace this placeholder with the given adapter.
@@ -126,14 +126,12 @@ where
 {
     type Item = E;
 
-    fn notify(&mut self, a: Self::Item) -> impl Future<Output = Result<()>>
+    async fn notify(&mut self, a: Self::Item) -> Result<()>
     where
         Self::Item: Clone + 'static,
     {
-        async {
-            self.first.notify(a.clone()).await?;
-            self.next.notify(a).await
-        }
+        self.first.notify(a.clone()).await?;
+        self.next.notify(a).await
     }
 }
 
@@ -151,16 +149,14 @@ where
 {
     type Item = A;
 
-    fn notify(&mut self, a: Self::Item) -> impl Future<Output = Result<()>>
+    async fn notify(&mut self, a: Self::Item) -> Result<()>
     where
         Self::Item: Clone + 'static,
     {
-        async {
-            if let Some(b) = (self.func)(a) {
-                self.inner.notify(b).await?;
-            }
-            Ok(())
+        if let Some(b) = (self.func)(a) {
+            self.inner.notify(b).await?;
         }
+        Ok(())
     }
 }
 
@@ -178,10 +174,8 @@ impl<A> AdaptChannel<A> {
 impl<A> Adapter for AdaptChannel<A> {
     type Item = A;
 
-    fn notify(&mut self, a: Self::Item) -> impl Future<Output = Result<()>> {
-        async {
-            self.sender.send(a).await?;
-            Ok(())
-        }
+    async fn notify(&mut self, a: Self::Item) -> Result<()> {
+        self.sender.send(a).await?;
+        Ok(())
     }
 }
