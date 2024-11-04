@@ -114,7 +114,8 @@ impl<A> Adapter for Discard<A> {
     }
 }
 
-/// A `Adapter` that bifucates notifications.  This contains two downstream adapters.
+/// An `Adapter` that bifucates notifications.  This contains two downstream adapters.
+#[derive(Debug)]
 pub struct Merge<S, T> {
     first: S,
     next: T,
@@ -136,6 +137,9 @@ where
     }
 }
 
+/// An `Adapter` that passes each item through an optional function
+/// and passes the `Some` values on.
+#[derive(Debug)]
 pub struct FilterMap<A, F, G> {
     func: F,
     inner: G,
@@ -162,11 +166,13 @@ where
 }
 
 /// A `Adapter` that forwards messages to an mpsc channel.
+#[derive(Debug)]
 pub struct AdaptChannel<A> {
     sender: Sender<A>,
 }
 
 impl<A> AdaptChannel<A> {
+    /// Create and `Adapter` that passes on items to a channel.
     pub fn new(sender: Sender<A>) -> Self {
         Self { sender }
     }
