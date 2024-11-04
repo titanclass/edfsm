@@ -4,12 +4,14 @@
 pub use event_driven_macros::impl_fsm;
 
 /// A type of input - commands or events.
+#[derive(Debug, Clone)]
 pub enum Input<C, E> {
     Command(C),
     Event(E),
 }
 
 /// Describes a type of state change that `on_event` can perform.
+#[derive(Debug, Clone, Copy)]
 pub enum Change {
     Transitioned,
     Updated,
