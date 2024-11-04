@@ -1,4 +1,5 @@
 use derive_more::From;
+#[cfg(feature = "tokio")]
 use tokio::sync::mpsc::error::SendError;
 
 /// Result type for this module
@@ -10,6 +11,7 @@ pub enum Error {
     ChannelClosed,
 }
 
+#[cfg(feature = "tokio")]
 impl<E> From<SendError<E>> for Error {
     fn from(_: SendError<E>) -> Self {
         Error::ChannelClosed

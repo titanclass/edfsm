@@ -1,6 +1,7 @@
 use crate::error::Result;
 use core::{future::Future, marker::PhantomData};
 use futures_util::{Stream, StreamExt};
+#[cfg(feature = "tokio")]
 use tokio::sync::mpsc::Sender;
 
 /// A trait to intercept messages in a `Machine` for logging and outbound communication.

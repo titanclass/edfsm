@@ -1,3 +1,7 @@
+#![no_std]
+#[cfg(feature = "std")]
+extern crate std;
+
 pub mod adapter;
 pub mod error;
 
@@ -7,6 +11,7 @@ use crate::{
 };
 use adapter::AdaptChannel;
 use edfsm::{Fsm, Input};
+#[cfg(feature = "tokio")]
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 /// The event type of an Fsm
@@ -225,7 +230,8 @@ pub trait Drain {
     fn drain_all(&mut self) -> Result<impl Iterator<Item = Self::Item>>;
 }
 
-impl<A> Drain for Vec<A> {
+#[cfg(feature = "std")]
+impl<A> Drain for std::vec::Vec<A> {
     type Item = A;
 
     fn drain_all(&mut self) -> Result<impl Iterator<Item = Self::Item>> {

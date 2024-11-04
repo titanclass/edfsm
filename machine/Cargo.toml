@@ -19,5 +19,6 @@ derive_more = { version = "1", features = ["from", "try_into"] }
 
 [features]
 default = ["tokio"]
-tokio = ["dep:tokio"]
+tokio = ["dep:tokio", "std"]
 embassy = []
+std = []
