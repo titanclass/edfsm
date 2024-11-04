@@ -31,7 +31,7 @@ pub enum Query<V> {
 
     /// Get all the entries
     GetAll(RespondMany<V>),
-    // Can't implement a remove command because cammands can't directly alter state.
+    // Can't implement a remove command because commands can't directly alter state.
     // Remove(Path, RespondOne<V>),
 }
 
@@ -115,6 +115,10 @@ impl Path {
     /// The length of this path.
     pub fn len(&self) -> usize {
         self.items.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.is_empty()
     }
 }
 
