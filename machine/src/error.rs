@@ -1,6 +1,4 @@
 use derive_more::From;
-#[cfg(feature = "tokio")]
-use tokio::sync::mpsc::error::SendError;
 
 /// Result type for this module
 pub type Result<A> = std::result::Result<A, Error>;
@@ -12,8 +10,19 @@ pub enum Error {
 }
 
 #[cfg(feature = "tokio")]
-impl<E> From<SendError<E>> for Error {
-    fn from(_: SendError<E>) -> Self {
-        Error::ChannelClosed
+pub mod adapt_channel {
+    use super::Error;
+    use tokio::sync::{broadcast, mpsc};
+
+    impl<E> From<mpsc::error::SendError<E>> for Error {
+        fn from(_: mpsc::error::SendError<E>) -> Self {
+            Error::ChannelClosed
+        }
+    }
+
+    impl<E> From<broadcast::error::SendError<E>> for Error {
+        fn from(_: broadcast::error::SendError<E>) -> Self {
+            Error::ChannelClosed
+        }
     }
 }

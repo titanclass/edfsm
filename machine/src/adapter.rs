@@ -1,8 +1,6 @@
 use crate::error::Result;
 use core::{future::Future, marker::PhantomData};
 use futures_util::{Stream, StreamExt};
-#[cfg(feature = "tokio")]
-use tokio::sync::mpsc::Sender;
 
 /// A trait to intercept messages in a `Machine` for logging and outbound communication.
 /// Adapters can be combined and this is the basis of a wiring scheme for machines.  
@@ -166,23 +164,26 @@ where
 }
 
 /// A `Adapter` that forwards messages to an mpsc channel.
-#[derive(Debug)]
-pub struct AdaptChannel<A> {
-    sender: Sender<A>,
-}
+#[cfg(feature = "tokio")]
+pub mod adapt_channel {
+    use crate::{adapter::Adapter, error::Result};
+    use tokio::sync::{broadcast, mpsc};
 
-impl<A> AdaptChannel<A> {
-    /// Create and `Adapter` that passes on items to a channel.
-    pub fn new(sender: Sender<A>) -> Self {
-        Self { sender }
+    impl<A> Adapter for mpsc::Sender<A> {
+        type Item = A;
+
+        async fn notify(&mut self, a: Self::Item) -> Result<()> {
+            self.send(a).await?;
+            Ok(())
+        }
     }
-}
 
-impl<A> Adapter for AdaptChannel<A> {
-    type Item = A;
+    impl<A> Adapter for broadcast::Sender<A> {
+        type Item = A;
 
-    async fn notify(&mut self, a: Self::Item) -> Result<()> {
-        self.sender.send(a).await?;
-        Ok(())
+        async fn notify(&mut self, a: Self::Item) -> Result<()> {
+            self.send(a)?;
+            Ok(())
+        }
     }
 }

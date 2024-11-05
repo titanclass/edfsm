@@ -9,7 +9,6 @@ use crate::{
     adapter::{Adapter, Discard},
     error::Result,
 };
-use adapter::AdaptChannel;
 use edfsm::{Fsm, Input};
 #[cfg(feature = "tokio")]
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -43,7 +42,7 @@ pub type State<M> = <M as Fsm>::S;
 /// the state machine specification, `Fsm::SE`.  Generally, side effects must
 /// be synchronous and if they may block they should be bracketed with tokio's `block_in_place`.
 ///
-/// The adapters are for outbound communication including event logging.
+/// The adapters are for communication and event logging.
 /// A machine's inputs and outputs can be wired up without changing the state machine.  
 /// Communication is always asynchronous and the adapter `notify` method is `async`.  
 pub struct Machine<M, N = Discard<Event<M>>, O = Discard<Out<M>>>
@@ -112,36 +111,23 @@ where
         }
     }
 
-    /// Return an adapter for input messages, which may be commands or events.
-    /// Any number of input adapters can be created, enabling fan-in of messages.
-    /// Messages received on any input adapter are enqued to the underlying state machine.
-    pub fn input(&self) -> impl Adapter<Item = In<M>>
-    where
-        In<M>: Clone + 'static,
-    {
-        AdaptChannel::new(self.sender.as_ref().unwrap().clone())
+    /// Return a new `Sender` for the input channel.
+    /// Any number can be created , enabling fan-in of messages.
+    ///
+    /// The sender accepts the Fsm `Input` values, representing either
+    /// a command or an event.   It implements `Adapter` so the type can be adjusted.
+    /// For example, to accept events only use:
+    ///
+    /// `machine.input().adapt_map(Input::Event)`
+    ///
+    pub fn input(&self) -> Sender<In<M>> {
+        self.sender.as_ref().unwrap().clone()
     }
 
-    /// Return an adapter for input events only. (See `input()`)
-    pub fn input_events(&self) -> impl Adapter<Item = Event<M>>
-    where
-        In<M>: Clone + 'static,
-    {
-        self.input().adapt_map(Input::Event)
-    }
-
-    /// Return an adapter for input commands only. (See `input()`)
-    pub fn input_commands(&self) -> impl Adapter<Item = Command<M>>
-    where
-        In<M>: Clone + 'static,
-    {
-        self.input().adapt_map(Input::Command)
-    }
-
-    /// Connect an adapter for logging events.  
-    /// Any number of adapters can be connected, enabling fan-out of messages.
-    /// Each adapter will receive all events,
-    /// however if an adapter stalls this will stall the state machine.
+    /// Connect a channel sender or adapter for logging events.  
+    ///
+    /// Any number of channels or adapters can be connected, enabling fan-out of messages.
+    /// Each will receive all events, however if an adapter stalls this will stall the state machine.
     pub fn connect_event_log<T>(self, logger: T) -> Machine<M, impl Adapter<Item = Event<M>>, O>
     where
         T: Adapter<Item = Event<M>>,
@@ -157,10 +143,10 @@ where
         }
     }
 
-    /// Connect adapter for output messages
-    /// Any number of adapters can be connected, enabling fan-out of messages.
-    /// Each adapter will receive all output messages,
-    /// however if an adapter stalls this will stall the state machine.
+    /// Connect a channel sender or adapter for output messages.
+    ///
+    /// Any number of channels or adapters can be connected, enabling fan-out of messages.
+    /// Each will receive all output messages, however if an adapter stalls this will stall the state machine.
     pub fn connect_output<T>(self, output: T) -> Machine<M, N, impl Adapter<Item = Out<M>>>
     where
         T: Adapter<Item = Out<M>>,
@@ -174,12 +160,6 @@ where
             logger: self.logger,
             output: self.output.merge(output),
         }
-    }
-
-    /// Access the sender side of the machine input channel
-    pub fn sender(&self) -> &Sender<In<M>> {
-        // Note: sender is always present when this method is accessable
-        self.sender.as_ref().unwrap()
     }
 
     /// Convert this machine into a future that will run as a task
