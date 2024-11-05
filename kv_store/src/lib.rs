@@ -15,7 +15,7 @@ use edfsm::{Change, Fsm};
 /// The functions of type `RespondOne` and `RespondMany` are passed the query result.
 ///
 /// Results contain borrowed values `&V` which can't be passed to channels or
-/// other data structures.  The repond function may clone these to pass them on,
+/// other data structures.  The respond function may clone these to pass them on,
 /// or the function may interpret or aggregate borrowed values in place.
 ///
 pub enum Query<V> {
@@ -31,8 +31,6 @@ pub enum Query<V> {
 
     /// Get all the entries
     GetAll(RespondMany<V>),
-    // Can't implement a remove command because commands can't directly alter state.
-    // Remove(Path, RespondOne<V>),
 }
 
 /// Type of a function that will respond to an iterator over query results.
@@ -82,12 +80,22 @@ where
     }
 
     fn on_event(r: &mut Self::S, e: &Self::E) -> Option<Change> {
-        let s = match r.0.entry(e.key()?) {
-            Entry::Vacant(entry) => entry.insert(Default::default()),
-            Entry::Occupied(entry) => entry.into_mut(),
-        };
-
-        M::on_event(s, e)
+        use Entry::*;
+        match (r.0.entry(e.key()?), e.terminating()) {
+            (Occupied(entry), false) => {
+                let s = entry.into_mut();
+                M::on_event(s, e)
+            }
+            (Vacant(entry), false) => {
+                let s = entry.insert(Default::default());
+                M::on_event(s, e)
+            }
+            (Occupied(entry), true) => {
+                entry.remove();
+                Some(Change::Transitioned)
+            }
+            (Vacant(_), true) => None,
+        }
     }
 
     fn on_change(r: &Self::S, e: &Self::E, se: &mut Self::SE, change: Change) {
@@ -100,9 +108,15 @@ where
     }
 }
 
-/// The trait for events that are dispatched by key.
+/// A trait for events that are dispatched by key.
 pub trait Keyed {
+    /// This event applies to state with at the given path.
+    /// If `None` the event is ignored.
     fn key(&self) -> Option<Path>;
+
+    /// This event is the final event for the path,
+    /// and the state at the path will be removed.
+    fn terminating(&self) -> bool;
 }
 
 /// The key to a KV store is a pathname, `Path`, and allows heirarchical grouping of values.
