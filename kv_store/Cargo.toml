@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 edfsm = { path = "../event-driven", version = "0.7" }
+derive_more = { version = "1", features = ["from"] }
 
 [dev-dependencies]
 streambed-patterns = "0.11"
