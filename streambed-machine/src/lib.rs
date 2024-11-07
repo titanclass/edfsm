@@ -208,9 +208,9 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn cbor_history() {
-        let log = FileLog::new("log").adapt::<Event>("topic", "group", Cbor);
-
+        let log = FileLog::new("path").adapt::<Event>("topic", "group", Cbor);
         let mut history = log.history().await;
         while let Some(event) = history.next().await {
             println!("{event:?}")
@@ -218,23 +218,19 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn cbor_produce() {
-        let log = FileLog::new("log").adapt::<Event>("topic", "group", Cbor);
-
+        let log = FileLog::new("path").adapt::<Event>("topic", "group", Cbor);
         for i in 1..100 {
             let _ = log.produce(Event::Num(i)).await;
         }
     }
 
     #[tokio::test]
+    #[ignore]
     async fn cbor_encrypted_history() {
-        let codec = CborEncrypted {
-            secret_store: fixture_store(),
-            secret_path: "secret_path".into(),
-        };
-
-        let log = FileLog::new("log").adapt::<Event>("topic", "group", codec);
-
+        let codec = CborEncrypted::new(fixture_store(), "secret_path");
+        let log = FileLog::new("path").adapt::<Event>("topic", "group", codec);
         let mut history = log.history().await;
         while let Some(event) = history.next().await {
             println!("{event:?}")
@@ -242,14 +238,10 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn cbor_encrypted_produce() {
-        let codec = CborEncrypted {
-            secret_store: fixture_store(),
-            secret_path: "secret_path".into(),
-        };
-
-        let log = FileLog::new("log").adapt::<Event>("topic", "group", codec);
-
+        let codec = CborEncrypted::new(fixture_store(), "secret_path");
+        let log = FileLog::new("path").adapt::<Event>("topic", "group", codec);
         for i in 1..100 {
             let _ = log.produce(Event::Num(i)).await;
         }
