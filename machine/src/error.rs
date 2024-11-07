@@ -10,7 +10,7 @@ pub enum Error {
 }
 
 #[cfg(feature = "tokio")]
-pub mod adapt_channel {
+pub mod adapt_tokio {
     use super::Error;
     use tokio::sync::{broadcast, mpsc};
 

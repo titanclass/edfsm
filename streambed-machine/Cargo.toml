@@ -1,0 +1,21 @@
+[package]
+name = "streambed-machine"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+streambed = { version = "0.11" }
+rand = { version = "0.8" }
+ciborium = { version = "0.2" }
+serde = { version = "1" }
+futures-util = { version = "0.3", default-features = false }
+async-stream = "0.3"
+streambed-confidant = "0.11.1"
+
+[dev-dependencies]
+rand = "0.8"
+derive_more = { version = "1", features = ["from", "try_into"] }
+tokio = { version = "1", features = ["full"] }
+streambed-logged = "0.11"
+edfsm = { path = "../event-driven", version = "0.7" }
+streambed-confidant = "0.11"

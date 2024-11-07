@@ -29,7 +29,7 @@ pub trait Adapter {
         }
     }
 
-    /// Combine two adapters. The notify call is delegated to both adapters.
+    /// Combine this with another adapter. The notify call is delegated to both adapters.
     fn merge<T>(self, other: T) -> impl Adapter<Item = Self::Item> + Send
     where
         T: Adapter<Item = Self::Item> + Send,
@@ -81,6 +81,7 @@ pub trait Adapter {
     }
 
     /// Create an adapter that fallibly converts each item from another type.
+    /// Items are passed on if conversion suceeds.
     fn adapt_try_from<A>(self) -> impl Adapter<Item = A> + Send
     where
         Self: Sized + Send,
@@ -192,7 +193,7 @@ where
 
 /// Implementations of  `Adapter` for tokio channels.
 #[cfg(feature = "tokio")]
-pub mod adapt_channel {
+pub mod adapt_tokio {
     use crate::{adapter::Adapter, error::Result};
     use tokio::sync::{broadcast, mpsc};
 
@@ -220,3 +221,7 @@ pub mod adapt_channel {
         }
     }
 }
+
+/// Implementations of `Adapter` for streambed
+#[cfg(feature = "streambed")]
+mod adapt_streambed {}

@@ -2,4 +2,4 @@
 
 resolver = "2"
 
-members = ["event-driven", "event-driven-macros", "kv_store", "machine"]
+members = ["event-driven", "event-driven-macros", "kv_store", "machine", "streambed-machine"]
