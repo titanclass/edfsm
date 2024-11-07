@@ -187,7 +187,8 @@ where
     where
         Self::Item: Clone + 'static,
     {
-        Ok(self.push(a))
+        self.push(a);
+        Ok(())
     }
 }
 
@@ -224,4 +225,24 @@ pub mod adapt_tokio {
 
 /// Implementations of `Adapter` for streambed
 #[cfg(feature = "streambed")]
-mod adapt_streambed {}
+mod adapt_streambed {
+    use crate::adapter::Adapter;
+    use streambed_machine::{Codec, CommitLog, CompactionKey, LogAdapter};
+
+    impl<L, C, A> Adapter for LogAdapter<L, C, A>
+    where
+        C: Codec<A> + Sync + Send,
+        L: CommitLog + Sync + Send,
+        A: CompactionKey + Send + Sync,
+    {
+        type Item = A;
+
+        async fn notify(&mut self, a: Self::Item) -> crate::error::Result<()>
+        where
+            Self::Item: Clone + 'static,
+        {
+            self.produce(a).await?;
+            Ok(())
+        }
+    }
+}

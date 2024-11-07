@@ -26,3 +26,14 @@ pub mod adapt_tokio {
         }
     }
 }
+
+#[cfg(feature = "streambed")]
+mod adapt_streambed {
+    use super::Error;
+
+    impl From<streambed_machine::ProducerError> for Error {
+        fn from(_: streambed_machine::ProducerError) -> Self {
+            Error::ChannelClosed
+        }
+    }
+}

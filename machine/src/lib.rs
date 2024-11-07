@@ -167,6 +167,7 @@ where
     }
 
     /// Convert this machine into a future that will run as a task
+    #[allow(clippy::manual_async_fn)]
     pub fn task(mut self) -> impl Future<Output = Result<()>> + Send
     where
         N: Adapter<Item = Event<M>> + Send,

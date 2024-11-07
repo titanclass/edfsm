@@ -4,12 +4,12 @@ use rand::thread_rng;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{future::Future, marker::PhantomData, pin::Pin, vec::Vec};
 use streambed::{
-    commit_log::{CommitLog, Offset, ProducerRecord, Subscription, Topic},
-    decrypt_buf, encrypt_struct,
+    commit_log::{Offset, ProducerRecord, Subscription, Topic},
+    decrypt_buf, encrypt_struct_with_secret, get_secret_value,
     secret_store::SecretStore,
 };
 
-pub use streambed::commit_log::ProducerError;
+pub use streambed::commit_log::{CommitLog, ProducerError};
 
 /// Provides the compaction key for an event.
 pub trait CompactionKey {
@@ -83,6 +83,7 @@ where
 
     /// Resturn an async stream of events representing the
     /// event history up to the time of the call.
+    #[allow(clippy::needless_lifetimes)]
     pub async fn history<'a>(&'a self) -> Pin<Box<impl Stream<Item = A> + 'a>> {
         let last_offset = self
             .commit_log
@@ -138,27 +139,22 @@ where
 
 /// A trait for asyncronous codecs.
 pub trait Codec<A> {
-    fn encode(&self, item: A) -> impl Future<Output = Option<Vec<u8>>>;
-    fn decode(&self, bytes: Vec<u8>) -> impl Future<Output = Option<A>>;
+    fn encode(&self, item: A) -> impl Future<Output = Option<Vec<u8>>> + Send;
+    fn decode(&self, bytes: Vec<u8>) -> impl Future<Output = Option<A>> + Send;
 }
 
 impl<S, A> Codec<A> for CborEncrypted<S>
 where
     S: SecretStore,
-    A: Serialize + DeserializeOwned,
+    A: Serialize + DeserializeOwned + Send,
 {
     async fn encode(&self, item: A) -> Option<Vec<u8>> {
-        encrypt_struct(
-            &self.secret_store,
-            &self.secret_path,
-            |item| {
-                let mut buf = Vec::new();
-                ciborium::ser::into_writer(item, &mut buf).map(|_| buf)
-            },
-            thread_rng,
-            &item,
-        )
-        .await
+        let secret_value = get_secret_value(&self.secret_store, &self.secret_path).await?;
+        let serialize = |item: &A| {
+            let mut buf = Vec::new();
+            ciborium::ser::into_writer(item, &mut buf).map(|_| buf)
+        };
+        encrypt_struct_with_secret(secret_value, serialize, thread_rng, &item)
     }
 
     async fn decode(&self, mut bytes: Vec<u8>) -> Option<A> {
@@ -175,7 +171,7 @@ pub struct Cbor;
 
 impl<A> Codec<A> for Cbor
 where
-    A: Serialize + DeserializeOwned,
+    A: Serialize + DeserializeOwned + Send,
 {
     async fn encode(&self, item: A) -> Option<Vec<u8>> {
         let mut buf = Vec::new();
