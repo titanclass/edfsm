@@ -15,11 +15,11 @@ pub trait Adapter {
 
     /// Consume the given asyn `Stream`, passing each item to this adapter.
     /// This adapter is then dropped.
-    fn notify_all<S>(mut self, mut stream: S) -> impl Future<Output = Result<()>>
+    fn notify_all<S>(mut self, mut stream: S) -> impl Future<Output = Result<()>> + Send
     where
-        Self: Sized,
-        S: Stream<Item = Self::Item> + Unpin,
-        Self::Item: Clone + 'static,
+        Self: Send + Sized,
+        S: Stream<Item = Self::Item> + Unpin + Send,
+        Self::Item: Clone + Send + 'static,
     {
         async move {
             while let Some(a) = stream.next().await {
