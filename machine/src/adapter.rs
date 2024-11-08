@@ -3,8 +3,11 @@ use core::{future::Future, marker::PhantomData};
 use futures_util::{Stream, StreamExt};
 
 /// A trait to intercept messages in a `Machine` for logging and outbound communication.
+///
 /// Adapters can be combined and this is the basis of a wiring scheme for machines.  
-pub trait Adapter {
+/// For the absence of doubt, all `Adapter`s are `Send` meaning they can be part of the
+/// state of a task in a multithreaded environment.
+pub trait Adapter: Send {
     type Item;
 
     /// Forward the given item to an asynchronous consumer, possibly converting the type

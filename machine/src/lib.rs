@@ -132,8 +132,8 @@ where
     /// Each will receive all events, however if an adapter stalls this will stall the state machine.
     pub fn connect_event_log<T>(self, logger: T) -> Machine<M, impl Adapter<Item = Event<M>>, O>
     where
-        T: Adapter<Item = Event<M>> + Send,
-        N: Adapter<Item = Event<M>> + Send,
+        T: Adapter<Item = Event<M>>,
+        N: Adapter<Item = Event<M>>,
         Event<M>: Send,
     {
         Machine {
@@ -152,8 +152,8 @@ where
     /// Each will receive all output messages, however if an adapter stalls this will stall the state machine.
     pub fn connect_output<T>(self, output: T) -> Machine<M, N, impl Adapter<Item = Out<M>>>
     where
-        T: Adapter<Item = Out<M>> + Send,
-        O: Adapter<Item = Out<M>> + Send,
+        T: Adapter<Item = Out<M>>,
+        O: Adapter<Item = Out<M>>,
         Out<M>: Send,
     {
         Machine {
@@ -170,8 +170,8 @@ where
     #[allow(clippy::manual_async_fn)]
     pub fn task(mut self) -> impl Future<Output = Result<()>> + Send
     where
-        N: Adapter<Item = Event<M>> + Send,
-        O: Adapter<Item = Out<M>> + Send,
+        N: Adapter<Item = Event<M>>,
+        O: Adapter<Item = Out<M>>,
         Event<M>: Clone + Send + 'static,
         Out<M>: Clone + Send + 'static,
         Effect<M>: Init<State<M>> + Send,
