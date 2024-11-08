@@ -81,7 +81,7 @@ where
         }
     }
 
-    /// Resturn an async stream of events representing the
+    /// Return an async stream of events representing the
     /// event history up to the time of the call.
     #[allow(clippy::needless_lifetimes)]
     pub async fn history<'a>(&'a self) -> Pin<Box<impl Stream<Item = A> + 'a>> {
@@ -186,13 +186,22 @@ where
 
 #[cfg(test)]
 mod test {
+
     use crate::{Cbor, CborEncrypted, CommitLogExt, CompactionKey};
     use futures_util::StreamExt;
     use serde::{Deserialize, Serialize};
+    use std::path::Path;
     use streambed_confidant::FileSecretStore;
     use streambed_logged::FileLog;
+    use tokio::task::yield_now;
 
-    #[derive(Serialize, Deserialize, Clone, Debug)]
+    // use std::time::Duration;
+    // use tokio::time::sleep;
+
+    const TEST_DATA: &str = "test_data";
+    const TOPIC: &str = "event_series";
+
+    #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     pub enum Event {
         Num(u32),
     }
@@ -207,30 +216,47 @@ mod test {
         todo!()
     }
 
-    #[tokio::test]
-    #[ignore]
-    async fn cbor_history() {
-        let log = FileLog::new("path").adapt::<Event>("topic", "group", Cbor);
-        let mut history = log.history().await;
-        while let Some(event) = history.next().await {
-            println!("{event:?}")
-        }
+    fn fixture_data() -> impl Iterator<Item = Event> {
+        (1..100).into_iter().map(Event::Num)
     }
 
     #[tokio::test]
-    #[ignore]
-    async fn cbor_produce() {
-        let log = FileLog::new("path").adapt::<Event>("topic", "group", Cbor);
-        for i in 1..100 {
-            let _ = log.produce(Event::Num(i)).await;
+    async fn cbor_history() {
+        cbor_produce().await;
+        // sleep(Duration::from_secs(1)).await;
+        let mut data = fixture_data();
+        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", Cbor);
+        let mut history = log.history().await;
+        while let Some(event) = history.next().await {
+            println!("{event:?}");
+            assert_eq!(event, data.next().unwrap());
         }
+        assert!(data.next().is_none());
+    }
+
+    async fn cbor_produce() {
+        let topic_file = [TEST_DATA, TOPIC].join("/");
+        let _ = std::fs::remove_file(&topic_file);
+        let _ = std::fs::create_dir(TEST_DATA);
+        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", Cbor);
+        for e in fixture_data() {
+            log.produce(e).await.expect("failed to produce a log entry");
+        }
+        assert!(Path::new(&topic_file).exists());
+        drop(log);
+        yield_now().await;
+    }
+
+    #[tokio::test]
+    async fn cbor_produce_test() {
+        cbor_produce().await;
     }
 
     #[tokio::test]
     #[ignore]
     async fn cbor_encrypted_history() {
         let codec = CborEncrypted::new(fixture_store(), "secret_path");
-        let log = FileLog::new("path").adapt::<Event>("topic", "group", codec);
+        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", codec);
         let mut history = log.history().await;
         while let Some(event) = history.next().await {
             println!("{event:?}")
@@ -241,7 +267,7 @@ mod test {
     #[ignore]
     async fn cbor_encrypted_produce() {
         let codec = CborEncrypted::new(fixture_store(), "secret_path");
-        let log = FileLog::new("path").adapt::<Event>("topic", "group", codec);
+        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", codec);
         for i in 1..100 {
             let _ = log.produce(Event::Num(i)).await;
         }
