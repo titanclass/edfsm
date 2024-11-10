@@ -10,6 +10,7 @@ struct Counter;
 #[derive(Clone, Debug)]
 enum Command {
     Print,
+    Assert(i32),
 }
 
 #[derive(Clone, Debug)]
@@ -37,6 +38,7 @@ impl Fsm for Counter {
     fn for_command(s: &Self::S, c: Self::C, _se: &mut Self::SE) -> Option<Self::E> {
         match c {
             Command::Print => println!("count = {}", s.count),
+            Command::Assert(count) => assert_eq!(count, s.count),
         }
         None
     }
@@ -73,6 +75,7 @@ async fn producer(sender: Sender<Input<Command, Event>>) -> Result<()> {
     for _ in 1..100 {
         sender.send(Input::Event(Event::Tick)).await?;
     }
+    sender.send(Input::Command(Command::Assert(99))).await?;
     Ok(())
 }
 
@@ -84,14 +87,13 @@ async fn consumer(mut receiver: Receiver<Output>) -> Result<()> {
 }
 
 #[tokio::test]
-async fn main() {
+async fn connection_test() {
     let _ = (Command::Print, Event::Reset); // avoid dead code
     let (send_o, recv_o) = channel::<Output>(3);
     let (send_o2, recv_o2) = channel::<Output>(3);
     let log = Vec::<Event>::default();
-    let machine = Machine::<Counter>::default();
 
-    let machine = machine
+    let machine = Machine::<Counter>::default()
         .connect_event_log(log)
         .connect_output(send_o)
         .connect_output(send_o2);
