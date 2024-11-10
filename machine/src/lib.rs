@@ -79,8 +79,8 @@ where
     Effect<M>: Drain,
     State<M>: Default,
 {
-    /// Construct a machine from an explicit, possibly non-default, effector.
-    /// This is also the constructor for a non-default input backlog value.
+    /// Construct a machine from an explicit, possibly non-default, effector,
+    /// and an explicit input buffer size.
     pub fn new(effector: Effect<M>, buffer: usize) -> Self {
         let (sender, receiver) = channel(buffer);
         Machine {
@@ -232,7 +232,7 @@ impl<A> Drain for std::vec::Vec<A> {
     }
 }
 
-/// The ability to initialize from a _state_ value.
+/// The ability to initialize with a given, starting _state_ value.
 ///
 /// This trait is required for `Fsm::SE` by the `hydrate` method.
 pub trait Init<S> {
@@ -240,7 +240,8 @@ pub trait Init<S> {
 }
 
 /// A `Hydrator` is an event `Adapter` that accepts
-/// a stream of initialisation events for a `Fsm`.
+/// a stream of initialisation events for an `Fsm`.
+///
 /// It will apply these to the state bringing it up
 /// to date without causing side effects.
 pub struct Hydrator<'a, M>
