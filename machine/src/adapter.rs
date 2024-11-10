@@ -74,7 +74,7 @@ pub trait Adapter: Send {
     }
 
     /// Create an adapter that converts each item from another type.
-    fn adapt_from<A>(self) -> impl Adapter<Item = A> + Send
+    fn adapt_into<A>(self) -> impl Adapter<Item = A> + Send
     where
         Self: Sized + Send,
         Self::Item: Clone + Send + 'static,
@@ -85,7 +85,7 @@ pub trait Adapter: Send {
 
     /// Create an adapter that fallibly converts each item from another type.
     /// Items are passed on if conversion suceeds.
-    fn adapt_try_from<A>(self) -> impl Adapter<Item = A> + Send
+    fn adapt_try_into<A>(self) -> impl Adapter<Item = A> + Send
     where
         Self: Sized + Send,
         Self::Item: Clone + Send + 'static,
