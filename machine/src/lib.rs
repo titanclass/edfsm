@@ -219,19 +219,6 @@ pub trait Drain {
     where
         Self::Item: Send;
 }
-
-#[cfg(feature = "std")]
-impl<A> Drain for std::vec::Vec<A> {
-    type Item = A;
-
-    fn drain_all(&mut self) -> Result<impl Iterator<Item = Self::Item> + Send>
-    where
-        Self::Item: Send,
-    {
-        Ok(self.drain(0..))
-    }
-}
-
 /// The ability to initialize with a given, starting _state_ value.
 ///
 /// This trait is required for `Fsm::SE` by the `hydrate` method.
@@ -265,5 +252,26 @@ where
     {
         M::on_event(self.state, &a);
         Ok(())
+    }
+}
+
+/// Implement effector traits for a std Vec.
+#[cfg(feature = "std")]
+pub mod output_vec {
+    use crate::{Drain, Init, Result};
+
+    impl<A> Drain for std::vec::Vec<A> {
+        type Item = A;
+
+        fn drain_all(&mut self) -> Result<impl Iterator<Item = Self::Item> + Send>
+        where
+            Self::Item: Send,
+        {
+            Ok(self.drain(0..))
+        }
+    }
+
+    impl<S, A> Init<S> for std::vec::Vec<A> {
+        fn init(&mut self, _: &S) {}
     }
 }
