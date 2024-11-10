@@ -5,12 +5,11 @@ extern crate std;
 pub mod adapter;
 pub mod error;
 
-use core::future::Future;
-
 use crate::{
     adapter::{Adapter, Discard},
     error::Result,
 };
+use core::future::Future;
 use edfsm::{Fsm, Input};
 #[cfg(feature = "tokio")]
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -45,7 +44,7 @@ pub type State<M> = <M as Fsm>::S;
 /// be synchronous and if they may block they should be bracketed with tokio's `block_in_place`.
 ///
 /// The adapters are for communication and event logging.
-/// A machine's inputs and outputs can be wired up without changing the state machine.  
+/// A machine's inputs and outputs can be wired up without affecting the underlying state machine.  
 /// Communication is always asynchronous and the adapter `notify` method is `async`.  
 pub struct Machine<M, N = Discard<Event<M>>, O = Discard<Out<M>>>
 where
