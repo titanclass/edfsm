@@ -48,6 +48,7 @@ type RespondOne<V> = Box<dyn FnOnce(Option<&V>)>;
 /// for each event or type `Path`.
 ///
 /// Commands are used to query and manager the store.  
+#[derive(Debug, Default)]
 pub struct KvStore<M>(BTreeMap<Path, M::S>)
 where
     M: Fsm;
