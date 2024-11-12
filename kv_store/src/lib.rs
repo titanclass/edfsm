@@ -3,6 +3,11 @@
 pub mod path;
 pub use path::Path;
 
+#[cfg(feature = "tokio")]
+pub mod ask;
+#[cfg(feature = "tokio")]
+pub use ask::Ask;
+
 extern crate alloc;
 use alloc::{
     boxed::Box,
