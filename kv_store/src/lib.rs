@@ -35,10 +35,10 @@ pub enum Query<V> {
 }
 
 /// Type of a function that will respond to an iterator over query results.
-type RespondMany<V> = Box<dyn FnOnce(&dyn Iterator<Item = (&Path, &V)>)>;
+type RespondMany<V> = Box<dyn FnOnce(&dyn Iterator<Item = (&Path, &V)>) + Send>;
 
 /// Type of a function that will respond to a single valued query response
-type RespondOne<V> = Box<dyn FnOnce(Option<&V>)>;
+type RespondOne<V> = Box<dyn FnOnce(Option<&V>) + Send>;
 
 /// `KvStore<M>` represents the collection of state machines of type `M`.
 ///
@@ -48,7 +48,7 @@ type RespondOne<V> = Box<dyn FnOnce(Option<&V>)>;
 /// for each event or type `Path`.
 ///
 /// Commands are used to query and manager the store.  
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct KvStore<M>(BTreeMap<Path, M::S>)
 where
     M: Fsm;
@@ -57,11 +57,11 @@ impl<M> Fsm for KvStore<M>
 where
     M: Fsm + 'static,
     M::S: Default,
-    M::E: Keyed,
+    M::E: Terminating,
 {
     type S = Self;
     type C = Query<M::S>;
-    type E = M::E;
+    type E = Keyed<M::E>;
     type SE = M::SE;
 
     fn for_command(store: &Self::S, command: Self::C, _se: &mut Self::SE) -> Option<Self::E> {
@@ -83,14 +83,14 @@ where
 
     fn on_event(r: &mut Self::S, e: &Self::E) -> Option<Change> {
         use Entry::*;
-        match (r.0.entry(e.key()?), e.terminating()) {
+        match (r.0.entry(e.key.clone()), e.item.terminating()) {
             (Occupied(entry), false) => {
                 let s = entry.into_mut();
-                M::on_event(s, e)
+                M::on_event(s, &e.item)
             }
             (Vacant(entry), false) => {
                 let s = entry.insert(Default::default());
-                M::on_event(s, e)
+                M::on_event(s, &e.item)
             }
             (Occupied(entry), true) => {
                 entry.remove();
@@ -102,23 +102,30 @@ where
 
     fn on_change(r: &Self::S, e: &Self::E, se: &mut Self::SE, change: Change) {
         let mut f = || {
-            let s = r.0.get(&e.key()?)?;
-            M::on_change(s, e, se, change);
+            let s = r.0.get(&e.key)?;
+            M::on_change(s, &e.item, se, change);
             Some(())
         };
         f();
     }
 }
 
-/// A trait for events that are dispatched by key.
-pub trait Keyed {
-    /// This event applies to state with at the given path.
-    /// If `None` the event is ignored.
-    fn key(&self) -> Option<Path>;
+/// This type pairs a `Path` with another value.
+/// This may be an event or output of a state machine
+/// in the KvStore.
+#[derive(Clone, Debug)]
+pub struct Keyed<A> {
+    pub key: Path,
+    pub item: A,
+}
 
-    /// This event is the final event for the path,
-    /// and the state at the path will be removed.
-    fn terminating(&self) -> bool;
+impl<M> Default for KvStore<M>
+where
+    M: Fsm,
+{
+    fn default() -> Self {
+        Self(BTreeMap::new())
+    }
 }
 
 /// The key to a KV store is a pathname, `Path`, and allows heirarchical grouping of values.
