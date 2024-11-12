@@ -21,9 +21,12 @@ async fn producer(sender: Sender<Input<Query<State>, Keyed<Event>>>) -> Result<(
 }
 
 async fn consumer(mut receiver: Receiver<Keyed<Output>>) -> Result<()> {
+    let mut tock_count = 0;
     while let Some(o) = receiver.recv().await {
-        println!("{o:?}")
+        println!("{o:?}");
+        tock_count += 1;
     }
+    assert_eq!(tock_count, 9);
     Ok(())
 }
 
