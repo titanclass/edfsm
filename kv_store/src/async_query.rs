@@ -38,7 +38,7 @@ where
     /// Apply `func` to these and return the result.
     pub async fn get_tree<F, R>(&mut self, path: Path, func: F) -> Result<R>
     where
-        F: FnOnce(&dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
+        F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
         V: 'static,
     {
@@ -50,7 +50,7 @@ where
     /// Apply `func` to these and return the result.
     pub async fn get_range<F, R>(&mut self, range: (Bound<Path>, Bound<Path>), func: F) -> Result<R>
     where
-        F: FnOnce(&dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
+        F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
         V: 'static,
     {
@@ -62,7 +62,7 @@ where
     /// Apply `func` to these and return the result.
     pub async fn get_all<F, R>(&mut self, func: F) -> Result<R>
     where
-        F: FnOnce(&dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
+        F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
         V: 'static,
     {
@@ -72,7 +72,7 @@ where
     async fn dispatch_many_valued<Q, F, R>(&mut self, query: Q, func: F) -> Result<R>
     where
         Q: FnOnce(RespondMany<V>) -> Query<V>,
-        F: FnOnce(&dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
+        F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
         V: 'static,
     {
@@ -95,7 +95,7 @@ where
 
 fn respond_many<F, V, R>(func: F, sender: oneshot::Sender<R>) -> RespondMany<V>
 where
-    F: FnOnce(&dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
+    F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
     R: Send + 'static,
 {
     Box::new(|vs| {

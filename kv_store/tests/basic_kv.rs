@@ -32,8 +32,12 @@ async fn consumer(mut receiver: Receiver<Keyed<Output>>) -> Result<()> {
 
 async fn asker(sender: Sender<Input<Query<State>, Keyed<Event>>>) -> Result<()> {
     let mut a = ask(sender.adapt_map(Input::Command));
+
     let n = a.get(Path::root(), |s| s.unwrap().count).await?;
     println!("The root element state is {n}");
+
+    let n = a.get_all(|ss| ss.fold(0, |t, (_p, s)| t + s.count)).await?;
+    println!("The sum of all element states {n}");
     Ok(())
 }
 

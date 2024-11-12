@@ -59,7 +59,7 @@ pub enum Query<V> {
 }
 
 /// Type of a function that will respond to an iterator over query results.
-type RespondMany<V> = Box<dyn FnOnce(&dyn Iterator<Item = (&Path, &V)>) + Send>;
+type RespondMany<V> = Box<dyn FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) + Send>;
 
 /// Type of a function that will respond to a single valued query response
 type RespondOne<V> = Box<dyn FnOnce(Option<&V>) + Send>;
@@ -94,13 +94,13 @@ where
         match command {
             Get(path, respond) => respond(store.0.get(&path)),
             GetTree(path, respond) => respond(
-                &(store
+                &mut (store
                     .0
                     .range((Included(&path), Unbounded))
                     .take_while(|(p, _)| p.len() > path.len() || *p == &path)),
             ),
-            GetRange(bounds, respond) => respond(&store.0.range(bounds)),
-            GetAll(respond) => respond(&store.0.iter()),
+            GetRange(bounds, respond) => respond(&mut store.0.range(bounds)),
+            GetAll(respond) => respond(&mut store.0.iter()),
         }
         None
     }
