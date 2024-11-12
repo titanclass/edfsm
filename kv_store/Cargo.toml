@@ -10,10 +10,19 @@ repository.workspace = true
 
 [dependencies]
 edfsm.workspace = true
+machine = { workspace = true, optional = true }
 derive_more = { version = "1", features = ["from"] }
+tokio = { version = "1", features = ["sync"], optional = true }
+embassy-sync = { version = "0.6.0", optional = true }
 
 [dev-dependencies]
 machine.workspace = true
 streambed-patterns = "0.11"
 tokio = { version = "1", features = ["full"] }
 serde = "1"
+
+[features]
+default = ["tokio"]
+tokio = ["dep:tokio", "dep:machine", "std"]
+embassy = ["dep:embassy-sync"]
+std = []
