@@ -1,6 +1,6 @@
-use edfsm::{Change, Fsm};
+use edfsm::{Change, Drain, Fsm, Init, Terminating};
 use serde::{Deserialize, Serialize};
-use streambed_machine::CompactionKey;
+use streambed_machine::RecordKey;
 
 pub struct Counter;
 
@@ -16,8 +16,8 @@ pub enum Event {
     Reset,
 }
 
-impl CompactionKey for Event {
-    fn compaction_key(&self) -> u64 {
+impl RecordKey for Event {
+    fn record_key(&self) -> u64 {
         0
     }
 }

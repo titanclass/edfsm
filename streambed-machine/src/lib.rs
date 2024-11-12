@@ -11,13 +11,13 @@ use streambed::{
 
 pub use streambed::commit_log::{CommitLog, ProducerError};
 
-/// Provides the compaction key for an event.
-pub trait CompactionKey {
-    fn compaction_key(&self) -> u64;
+/// Provides a key for an item that will be stored in the log record.
+pub trait RecordKey {
+    fn record_key(&self) -> u64;
 }
 
-/// Wraps a `CommitLog` and specializes it for a specific event type.
-/// This adds the event type, topic and the encoding and encryption scheme.
+/// Wraps a `CommitLog` and specializes it for a specific payload type.
+/// This adds the type, topic and the encoding and encryption scheme.
 #[derive(Debug)]
 pub struct LogAdapter<L, C, A> {
     commit_log: L,
@@ -27,12 +27,12 @@ pub struct LogAdapter<L, C, A> {
     marker: PhantomData<A>,
 }
 
-/// Provides a method on `CommitLog` to specialize it for an event type.
+/// Provides a method on `CommitLog` to specialize it for a payload type.
 pub trait CommitLogExt
 where
     Self: CommitLog + Sized,
 {
-    /// Specialize this commit log for events of type `A`
+    /// Specialize this commit log for items of type `A`
     /// The topic and group names are given and a `Codec`
     /// for encoding and decoding values of type `A`.
     fn adapt<A>(
@@ -57,11 +57,11 @@ impl<L, C, A> LogAdapter<L, C, A>
 where
     L: CommitLog,
     C: Codec<A>,
-    A: CompactionKey + Clone + 'static,
+    A: RecordKey + Clone + 'static,
 {
-    /// Send one event to the underlying commit log.
+    /// Send one item to the underlying commit log.
     pub async fn produce(&self, item: A) -> Result<Offset, ProducerError> {
-        let key = item.compaction_key();
+        let key = item.record_key();
         let topic = self.topic.clone();
 
         if let Some(value) = self.codec.encode(item).await {
@@ -81,8 +81,8 @@ where
         }
     }
 
-    /// Return an async stream of events representing the
-    /// event history up to the time of the call.
+    /// Return an async stream of items representing the
+    /// history up to the time of the call.
     #[allow(clippy::needless_lifetimes)]
     pub async fn history<'a>(&'a self) -> Pin<Box<impl Stream<Item = A> + 'a>> {
         let last_offset = self
@@ -102,8 +102,8 @@ where
             if let Some(last_offset) = last_offset {
                 while let Some(r) = records.next().await {
                     if r.offset <= last_offset {
-                        if let Some(event) = self.codec.decode(r.value).await {
-                            yield event;
+                        if let Some(item) = self.codec.decode(r.value).await {
+                            yield item;
                         }
                         if r.offset == last_offset {
                             break;
@@ -187,7 +187,7 @@ where
 #[cfg(test)]
 mod test {
 
-    use crate::{Cbor, CborEncrypted, CommitLogExt, CompactionKey};
+    use crate::{Cbor, CborEncrypted, CommitLogExt, RecordKey};
     use futures_util::StreamExt;
     use serde::{Deserialize, Serialize};
     use std::path::Path;
@@ -206,8 +206,8 @@ mod test {
         Num(u32),
     }
 
-    impl CompactionKey for Event {
-        fn compaction_key(&self) -> u64 {
+    impl RecordKey for Event {
+        fn record_key(&self) -> u64 {
             0
         }
     }
