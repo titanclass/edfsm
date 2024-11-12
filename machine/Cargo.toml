@@ -1,14 +1,15 @@
 [package]
 name = "machine"
-version = "0.1.0"
-edition = "2021"
 description = "Tasks and Channels for Event Driven Finite State Machines"
-license = "Apache-2.0"
-readme = "../README.md"
-repository = "https://github.com/titanclass/edfsm.git"
+readme = "README.md"
+
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
-edfsm = { path = "../event-driven", version = "0.7" }
+edfsm.workspace = true
 tokio = { version = "1", features = ["sync"], optional = true }
 derive_more = { version = "1", features = ["from"] }
 futures-util = { version = "0.3", default-features = false }
