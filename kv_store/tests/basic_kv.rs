@@ -20,7 +20,7 @@ async fn producer(sender: Sender<Input<Query<State>, Keyed<Event>>>) -> Result<(
     Ok(())
 }
 
-async fn consumer(mut receiver: Receiver<Output>) -> Result<()> {
+async fn consumer(mut receiver: Receiver<Keyed<Output>>) -> Result<()> {
     while let Some(o) = receiver.recv().await {
         println!("{o:?}")
     }
@@ -29,8 +29,8 @@ async fn consumer(mut receiver: Receiver<Output>) -> Result<()> {
 
 #[tokio::test]
 async fn basic_kv_test() {
-    let (send_o, recv_o) = channel::<Output>(3);
-    let (send_o2, recv_o2) = channel::<Output>(3);
+    let (send_o, recv_o) = channel::<Keyed<Output>>(3);
+    let (send_o2, recv_o2) = channel::<Keyed<Output>>(3);
     let log = Vec::<Keyed<Event>>::default();
 
     let machine = Machine::<KvStore<Counter>>::default()

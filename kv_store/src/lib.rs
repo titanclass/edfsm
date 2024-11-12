@@ -1,14 +1,33 @@
 #![no_std]
+
+pub mod path;
+pub use path::Path;
+
 extern crate alloc;
 use alloc::{
     boxed::Box,
     collections::{btree_map::Entry, BTreeMap},
-    string::{String, ToString},
-    vec::Vec,
 };
 use core::{clone::Clone, ops::Bound};
-use derive_more::From;
-use edfsm::{Change, Fsm, Terminating};
+use edfsm::{Change, Drain, Fsm, Init, Input, Terminating};
+
+/// The event type of an Fsm
+pub type Event<M> = <M as Fsm>::E;
+
+/// The command type of an Fsm
+pub type Command<M> = <M as Fsm>::C;
+
+/// The input type of an Fsm
+pub type In<M> = Input<<M as Fsm>::C, <M as Fsm>::E>;
+
+/// The output message type of an Fsm for the purpose of this module.
+pub type Out<M> = <<M as Fsm>::SE as Drain>::Item;
+
+/// The effector/effects type of an Fsm
+pub type Effect<M> = <M as Fsm>::SE;
+
+/// The state type of an Fsm
+pub type State<M> = <M as Fsm>::S;
 
 /// A query to the KV store.
 ///
@@ -48,21 +67,21 @@ type RespondOne<V> = Box<dyn FnOnce(Option<&V>) + Send>;
 /// for each event or type `Path`.
 ///
 /// Commands are used to query and manager the store.  
-#[derive(Debug)]
-pub struct KvStore<M>(BTreeMap<Path, M::S>)
+pub struct KvStore<M>(BTreeMap<Path, State<M>>)
 where
     M: Fsm;
 
 impl<M> Fsm for KvStore<M>
 where
     M: Fsm + 'static,
-    M::S: Default,
-    M::E: Terminating,
+    State<M>: Default,
+    Event<M>: Terminating,
+    Effect<M>: Drain,
 {
     type S = Self;
-    type C = Query<M::S>;
-    type E = Keyed<M::E>;
-    type SE = M::SE;
+    type C = Query<State<M>>;
+    type E = Keyed<Event<M>>;
+    type SE = Keyed<Effect<M>>;
 
     fn for_command(store: &Self::S, command: Self::C, _se: &mut Self::SE) -> Option<Self::E> {
         use Bound::*;
@@ -103,7 +122,8 @@ where
     fn on_change(r: &Self::S, e: &Self::E, se: &mut Self::SE, change: Change) {
         let mut f = || {
             let s = r.0.get(&e.key)?;
-            M::on_change(s, &e.item, se, change);
+            se.key = e.key.clone();
+            M::on_change(s, &e.item, &mut se.item, change);
             Some(())
         };
         f();
@@ -128,54 +148,32 @@ where
     }
 }
 
-/// The key to a KV store is a pathname, `Path`, and allows heirarchical grouping of values.
-/// A path can be constructed with an expression such as:
-///
-///  `Path::root().append("first_level").append(42),append("third_level")`
-///
-/// or imperatively using `path.push(item)`.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default)]
-pub struct Path {
-    items: Vec<PathItem>,
-}
+impl<SE> Drain for Keyed<SE>
+where
+    SE: Drain,
+{
+    type Item = Keyed<SE::Item>;
 
-impl Path {
-    /// Another name for the empty path, also the default path.
-    pub fn root() -> Self {
-        Self::default()
-    }
-
-    /// Append an item to the path
-    pub fn append(mut self, item: impl Into<PathItem>) -> Self {
-        self.push(item.into());
-        self
-    }
-
-    /// Push a `PathItem` to the end of this path
-    pub fn push(&mut self, item: PathItem) {
-        self.items.push(item);
-    }
-
-    /// The length of this path.
-    pub fn len(&self) -> usize {
-        self.items.len()
-    }
-
-    /// This is the empty or root path.
-    pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
+    fn drain_all(&mut self) -> impl Iterator<Item = Self::Item> + Send {
+        self.item.drain_all().map(|item| Keyed {
+            key: self.key.clone(),
+            item,
+        })
     }
 }
 
-/// One element of a `Path` can be a number or a name.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From)]
-pub enum PathItem {
-    Number(u64),
-    Name(String),
+impl<S, SE> Init<S> for Keyed<SE> {
+    fn init(&mut self, _state: &S) {}
 }
 
-impl From<&str> for PathItem {
-    fn from(value: &str) -> Self {
-        value.to_string().into()
+impl<SE> Default for Keyed<SE>
+where
+    SE: Default,
+{
+    fn default() -> Self {
+        Self {
+            key: Default::default(),
+            item: Default::default(),
+        }
     }
 }
