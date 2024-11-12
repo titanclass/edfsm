@@ -252,7 +252,7 @@ mod commit_log {
         Event<M>: Send + Sync + RecordKey + Clone + 'static,
     {
         /// Connect this Fsm to a streambed `CommitLog` and initialise its state.
-        pub async fn initialize<L, C>(
+        pub async fn initialise<L, C>(
             mut self,
             log: LogAdapter<L, C, Event<M>>,
         ) -> Machine<M, impl Adapter<Item = Event<M>>, O>
