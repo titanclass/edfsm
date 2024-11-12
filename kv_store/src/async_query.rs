@@ -1,12 +1,10 @@
 #![cfg(feature = "tokio")]
 
-use core::ops::Bound;
-
+use crate::{Path, Query, RespondMany, RespondOne};
 use alloc::boxed::Box;
+use core::ops::Bound;
 use machine::{adapter::Adapter, error::Result};
 use tokio::sync::oneshot;
-
-use crate::{Path, Query, RespondMany, RespondOne};
 
 /// Initiate an async `kv_store` `Query` on the given channel or adapter
 pub fn ask<T>(sender: T) -> Ask<T> {

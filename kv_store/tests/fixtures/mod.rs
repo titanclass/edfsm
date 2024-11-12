@@ -22,7 +22,7 @@ pub enum Output {
 
 #[derive(Debug, Default)]
 pub struct State {
-    count: i32,
+    pub count: i32,
 }
 
 impl Fsm for Counter {

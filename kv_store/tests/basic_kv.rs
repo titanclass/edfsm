@@ -1,8 +1,8 @@
 pub mod fixtures;
 use edfsm::Input;
 use fixtures::{Counter, Event, Output, State};
-use kv_store::{Keyed, KvStore, Path, Query};
-use machine::{error::Result, Machine};
+use kv_store::{ask, Keyed, KvStore, Path, Query};
+use machine::{adapter::Adapter, error::Result, Machine};
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     task::JoinSet,
@@ -30,6 +30,13 @@ async fn consumer(mut receiver: Receiver<Keyed<Output>>) -> Result<()> {
     Ok(())
 }
 
+async fn asker(sender: Sender<Input<Query<State>, Keyed<Event>>>) -> Result<()> {
+    let mut a = ask(sender.adapt_map(Input::Command));
+    let n = a.get(Path::root(), |s| s.unwrap().count).await?;
+    println!("The root element state is {n}");
+    Ok(())
+}
+
 #[tokio::test]
 async fn basic_kv_test() {
     let (send_o, recv_o) = channel::<Keyed<Output>>(3);
@@ -37,10 +44,12 @@ async fn basic_kv_test() {
     let machine = Machine::<KvStore<Counter>>::default().connect_output(send_o);
     let prod_task = producer(machine.input());
     let cons_task = consumer(recv_o);
+    let ask_task = asker(machine.input());
 
     let mut set = JoinSet::new();
     set.spawn(machine.task());
     set.spawn(cons_task);
     set.spawn(prod_task);
+    set.spawn(ask_task);
     set.join_all().await;
 }
