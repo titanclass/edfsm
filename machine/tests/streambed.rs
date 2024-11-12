@@ -1,5 +1,6 @@
+pub mod fixtures;
 use edfsm::Input;
-use edfsm_fixtures::counter::{Command, Counter, Event};
+use fixtures::{Command, Counter, Event};
 use machine::{error::Result, Machine};
 use streambed_logged::FileLog;
 use streambed_machine::{Cbor, CommitLogExt};

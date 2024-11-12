@@ -1,5 +1,6 @@
+pub mod fixtures;
 use edfsm::Input;
-use edfsm_fixtures::counter::{Command, Counter, Event, Output};
+use fixtures::{Command, Counter, Event, Output};
 use machine::{error::Result, Machine};
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},

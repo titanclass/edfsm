@@ -1,5 +1,6 @@
+pub mod fixtures;
 use edfsm::Input;
-use edfsm_fixtures::counter::{Counter, Event, Output, State};
+use fixtures::{Counter, Event, Output, State};
 use kv_store::{Keyed, KvStore, Path, Query};
 use machine::{error::Result, Machine};
 use tokio::{

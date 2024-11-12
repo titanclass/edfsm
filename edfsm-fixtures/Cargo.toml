@@ -1,9 +1,0 @@
-[package]
-name = "edfsm-fixtures"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-edfsm = { path = "../event-driven", version = "0.7" }
-streambed-machine = { path = "../streambed-machine", version = "0.1" }
-serde = "1"
