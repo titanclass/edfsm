@@ -10,7 +10,7 @@ use crate::{
     error::Result,
 };
 use core::future::Future;
-use edfsm::{Fsm, Input};
+use edfsm::{Drain, Fsm, Init, Input};
 
 #[cfg(feature = "tokio")]
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -187,7 +187,7 @@ where
             self.effector.init(&self.state);
 
             // Flush output messages generated in initialisation
-            for item in self.effector.drain_all()? {
+            for item in self.effector.drain_all() {
                 self.output.notify(item).await?
             }
 
@@ -199,32 +199,13 @@ where
                 }
 
                 // Flush output messages generated during the `step`, if any.
-                for item in self.effector.drain_all()? {
+                for item in self.effector.drain_all() {
                     self.output.notify(item).await?
                 }
             }
             Ok(())
         }
     }
-}
-
-/// The ability to extract messages.
-///
-/// This trait is required for `Fsm::SE` to collect output from the effector.
-pub trait Drain {
-    /// Messages generated in the effector
-    type Item;
-
-    /// remove and return accumulated messages.
-    fn drain_all(&mut self) -> Result<impl Iterator<Item = Self::Item> + Send>
-    where
-        Self::Item: Send;
-}
-/// The ability to initialize with a given, starting _state_ value.
-///
-/// This trait is required for `Fsm::SE` by the `hydrate` method.
-pub trait Init<S> {
-    fn init(&mut self, state: &S);
 }
 
 /// A `Hydrator` is an event `Adapter` that accepts
@@ -253,27 +234,6 @@ where
     {
         M::on_event(self.state, &a);
         Ok(())
-    }
-}
-
-/// Implement effector traits for a std Vec.
-#[cfg(feature = "std")]
-pub mod output_vec {
-    use crate::{Drain, Init, Result};
-
-    impl<A> Drain for std::vec::Vec<A> {
-        type Item = A;
-
-        fn drain_all(&mut self) -> Result<impl Iterator<Item = Self::Item> + Send>
-        where
-            Self::Item: Send,
-        {
-            Ok(self.drain(0..))
-        }
-    }
-
-    impl<S, A> Init<S> for std::vec::Vec<A> {
-        fn init(&mut self, _: &S) {}
     }
 }
 

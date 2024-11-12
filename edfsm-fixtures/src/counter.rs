@@ -36,7 +36,7 @@ impl Fsm for Counter {
     type S = State;
     type C = Command;
     type E = Event;
-    type SE = Vec<Output>;
+    type SE = OutputBuffer<Output>;
 
     fn for_command(s: &Self::S, c: Self::C, _se: &mut Self::SE) -> Option<Self::E> {
         match c {
@@ -67,5 +67,41 @@ impl Fsm for Counter {
         if s.count % 10 == 0 {
             se.push(Output::Tock);
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct OutputBuffer<A>(pub std::vec::Vec<A>);
+
+impl<A> OutputBuffer<A> {
+    pub fn push(&mut self, item: A) {
+        self.0.push(item);
+    }
+}
+
+impl<A> Default for OutputBuffer<A> {
+    fn default() -> Self {
+        Self(Vec::new())
+    }
+}
+
+impl<A> Drain for OutputBuffer<A>
+where
+    A: Send,
+{
+    type Item = A;
+
+    fn drain_all(&mut self) -> impl Iterator<Item = Self::Item> {
+        self.0.drain(0..)
+    }
+}
+
+impl<S, A> Init<S> for OutputBuffer<A> {
+    fn init(&mut self, _: &S) {}
+}
+
+impl Terminating for Event {
+    fn terminating(&self) -> bool {
+        false
     }
 }

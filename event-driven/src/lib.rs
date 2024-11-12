@@ -82,9 +82,46 @@ pub trait Fsm {
     }
 }
 
+// The following traits can be used with `Fsm` but are optional.
+
+/// The ability to perform initial effects given a starting state.
+///
+/// This trait can be implemented for `Fsm::SE`.  A state machine driver
+/// that requires this will call `init` with the initial state, possibly
+/// recovered from storage or by rehydration, before accepting any
+/// commands or live events.
+pub trait Init<S> {
+    /// Perform any initial effects given an initial state.
+    fn init(&mut self, state: &S);
+}
+
+/// A trait to mark the terminating event of a state machine.
+///
+/// This can be implemented by `Fsm::E`.
+/// If `event.terminating()` then no more events are expected
+/// for the receiving state machine and the state machine driver
+/// might drop it or take other lifecycle steps.
+pub trait Terminating {
+    /// This event is the final event.
+    fn terminating(&self) -> bool;
+}
+
+/// The ability to extract output messages from a state machine.
+///
+/// This trait can be implement for `Fsm::SE`. A state machine driver
+/// that requires this will call `drain_all` after each `step` and
+/// forward the returned output messages.
+pub trait Drain {
+    /// Messages generated during a state machine `step`.
+    type Item;
+
+    /// remove and return accumulated messages.
+    fn drain_all(&mut self) -> impl Iterator<Item = Self::Item> + Send;
+}
+
 #[cfg(test)]
-mod tests {
-    use super::*;
+mod test {
+    use super::{Change, Fsm, Input};
 
     #[test]
     fn test_step() {

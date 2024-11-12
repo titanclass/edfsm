@@ -8,7 +8,7 @@ use alloc::{
 };
 use core::{clone::Clone, ops::Bound};
 use derive_more::From;
-use edfsm::{Change, Fsm};
+use edfsm::{Change, Fsm, Terminating};
 
 /// A query to the KV store.
 ///
