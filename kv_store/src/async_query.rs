@@ -8,12 +8,21 @@ use tokio::sync::oneshot;
 
 use crate::{Path, Query, RespondMany, RespondOne};
 
+/// Initiate an async `kv_store` `Query` on the given channel or adapter
+pub fn ask<T>(sender: T) -> Ask<T> {
+    Ask(sender)
+}
+
+/// A target for `kv_store` `Query`s
+#[derive(Debug)]
 pub struct Ask<T>(T);
 
 impl<T, V> Ask<T>
 where
     T: Adapter<Item = Query<V>>,
 {
+    /// Get the value at the given path.
+    /// Apply `func` to this and return the result.
     pub async fn get<F, R>(&mut self, path: Path, func: F) -> Result<R>
     where
         F: FnOnce(Option<&V>) -> R + Send + 'static,
@@ -26,6 +35,9 @@ where
         Ok(receiver.await?)
     }
 
+    /// Get the entries whose path starts with the given path,
+    /// including the entry for the path itself.
+    /// Apply `func` to these and return the result.
     pub async fn get_tree<F, R>(&mut self, path: Path, func: F) -> Result<R>
     where
         F: FnOnce(&dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
@@ -36,6 +48,8 @@ where
             .await
     }
 
+    /// Get the entries in the given range
+    /// Apply `func` to these and return the result.
     pub async fn get_range<F, R>(&mut self, range: (Bound<Path>, Bound<Path>), func: F) -> Result<R>
     where
         F: FnOnce(&dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
@@ -46,6 +60,8 @@ where
             .await
     }
 
+    /// Get all the entries
+    /// Apply `func` to these and return the result.
     pub async fn get_all<F, R>(&mut self, func: F) -> Result<R>
     where
         F: FnOnce(&dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
@@ -74,7 +90,7 @@ where
     F: FnOnce(Option<&V>) -> R + Send + 'static,
     R: Send + 'static,
 {
-    Box::new(move |v| {
+    Box::new(|v| {
         let _ = sender.send(func(v));
     })
 }
@@ -84,7 +100,7 @@ where
     F: FnOnce(&dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
     R: Send + 'static,
 {
-    Box::new(move |vs| {
+    Box::new(|vs| {
         let _ = sender.send(func(vs));
     })
 }

@@ -4,9 +4,9 @@ pub mod path;
 pub use path::Path;
 
 #[cfg(feature = "tokio")]
-pub mod ask;
+pub mod async_query;
 #[cfg(feature = "tokio")]
-pub use ask::Ask;
+pub use async_query::{ask, Ask};
 
 extern crate alloc;
 use alloc::{
