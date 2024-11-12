@@ -95,6 +95,6 @@ impl<S, A> Init<S> for OutputBuffer<A> {
 
 impl Terminating for Event {
     fn terminating(&self) -> bool {
-        false
+        matches!(self, Event::Reset)
     }
 }

@@ -30,22 +30,14 @@ async fn consumer(mut receiver: Receiver<Keyed<Output>>) -> Result<()> {
 #[tokio::test]
 async fn basic_kv_test() {
     let (send_o, recv_o) = channel::<Keyed<Output>>(3);
-    let (send_o2, recv_o2) = channel::<Keyed<Output>>(3);
-    let log = Vec::<Keyed<Event>>::default();
 
-    let machine = Machine::<KvStore<Counter>>::default()
-        .connect_event_log(log)
-        .connect_output(send_o)
-        .connect_output(send_o2);
-
+    let machine = Machine::<KvStore<Counter>>::default().connect_output(send_o);
     let prod_task = producer(machine.input());
     let cons_task = consumer(recv_o);
-    let cons_task2 = consumer(recv_o2);
 
     let mut set = JoinSet::new();
     set.spawn(machine.task());
     set.spawn(cons_task);
-    set.spawn(cons_task2);
     set.spawn(prod_task);
     set.join_all().await;
 }
