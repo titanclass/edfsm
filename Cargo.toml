@@ -19,6 +19,8 @@ license = "Apache-2.0"
 repository = "https://github.com/titanclass/edfsm.git"
 
 [workspace.dependencies]
-event-driven-macros = { path = "event-driven-macros", version = "0.7.0" }
 edfsm = { path = "event-driven", version = "0.7.0" }
+event-driven-macros = { path = "event-driven-macros", version = "0.7.0" }
 streambed-machine = { path = "streambed-machine", version = "0.1.0" }
+machine = { path = "machine", version = "0.7.0" }
+kv_store = { path = "kv_store", version = "0.7.0" }
