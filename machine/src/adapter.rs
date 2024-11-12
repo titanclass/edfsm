@@ -14,7 +14,7 @@ pub trait Adapter: Send {
     /// or possibly dropping the item if it cannot be converted.
     fn notify(&mut self, a: Self::Item) -> impl Future<Output = Result<()>> + Send
     where
-        Self::Item: Clone + 'static;
+        Self::Item: 'static;
 
     /// Consume the given asyn `Stream`, passing each item to this adapter.
     /// This adapter is then dropped.
@@ -22,7 +22,7 @@ pub trait Adapter: Send {
     where
         Self: Send + Sized,
         S: Stream<Item = Self::Item> + Unpin + Send,
-        Self::Item: Clone + Send + 'static,
+        Self::Item: Send + 'static,
     {
         async move {
             while let Some(a) = stream.next().await {
@@ -37,7 +37,7 @@ pub trait Adapter: Send {
     where
         T: Adapter<Item = Self::Item> + Send,
         Self: Sized + Send,
-        Self::Item: Send,
+        Self::Item: Send + Clone,
     {
         Merge {
             first: self,
@@ -53,7 +53,7 @@ pub trait Adapter: Send {
     ) -> impl Adapter<Item = A> + Send
     where
         Self: Sized + Send,
-        Self::Item: Clone + Send + 'static,
+        Self::Item: Send + 'static,
         A: Send,
     {
         FilterMap {
@@ -67,7 +67,7 @@ pub trait Adapter: Send {
     fn adapt_map<A>(self, func: impl Fn(A) -> Self::Item + Send) -> impl Adapter<Item = A> + Send
     where
         Self: Sized + Send,
-        Self::Item: Clone + Send + 'static,
+        Self::Item: Send + 'static,
         A: Send,
     {
         self.adapt_filter_map(move |a| Some(func(a)))
@@ -77,7 +77,7 @@ pub trait Adapter: Send {
     fn adapt_into<A>(self) -> impl Adapter<Item = A> + Send
     where
         Self: Sized + Send,
-        Self::Item: Clone + Send + 'static,
+        Self::Item: Send + 'static,
         A: Into<Self::Item> + Send,
     {
         self.adapt_filter_map::<A>(move |a| Some(a.into()))
@@ -88,7 +88,7 @@ pub trait Adapter: Send {
     fn adapt_try_into<A>(self) -> impl Adapter<Item = A> + Send
     where
         Self: Sized + Send,
-        Self::Item: Clone + Send + 'static,
+        Self::Item: Send + 'static,
         A: TryInto<Self::Item> + Send,
     {
         self.adapt_filter_map::<A>(move |a| a.try_into().ok())
@@ -132,17 +132,17 @@ pub struct Merge<S, T> {
     next: T,
 }
 
-impl<E, S, T> Adapter for Merge<S, T>
+impl<A, S, T> Adapter for Merge<S, T>
 where
-    S: Adapter<Item = E> + Send,
-    T: Adapter<Item = E> + Send,
-    E: Send,
+    S: Adapter<Item = A> + Send,
+    T: Adapter<Item = A> + Send,
+    A: Send + Clone,
 {
-    type Item = E;
+    type Item = A;
 
     async fn notify(&mut self, a: Self::Item) -> Result<()>
     where
-        Self::Item: Clone + 'static,
+        Self::Item: 'static,
     {
         self.first.notify(a.clone()).await?;
         self.next.notify(a).await
@@ -161,7 +161,7 @@ pub struct FilterMap<A, F, G> {
 impl<F, G, A, B> Adapter for FilterMap<A, F, G>
 where
     F: Fn(A) -> Option<B> + Send,
-    B: Clone + Send + 'static,
+    B: Send + 'static,
     G: Adapter<Item = B> + Send,
     A: Send,
 {
@@ -169,7 +169,7 @@ where
 
     async fn notify(&mut self, a: Self::Item) -> Result<()>
     where
-        Self::Item: Clone + 'static,
+        Self::Item: 'static,
     {
         if let Some(b) = (self.func)(a) {
             self.inner.notify(b).await?;
@@ -188,7 +188,7 @@ where
 
     async fn notify(&mut self, a: Self::Item) -> Result<()>
     where
-        Self::Item: Clone + 'static,
+        Self::Item: 'static,
     {
         self.push(a);
         Ok(())
@@ -230,19 +230,19 @@ pub mod adapt_tokio {
 #[cfg(feature = "streambed")]
 mod adapt_streambed {
     use crate::adapter::Adapter;
-    use streambed_machine::{Codec, CommitLog, RecordKey, LogAdapter};
+    use streambed_machine::{Codec, CommitLog, LogAdapter, RecordKey};
 
     impl<L, C, A> Adapter for LogAdapter<L, C, A>
     where
         C: Codec<A> + Sync + Send,
         L: CommitLog + Sync + Send,
-        A: RecordKey + Send + Sync,
+        A: RecordKey + Send + Sync + Clone,
     {
         type Item = A;
 
         async fn notify(&mut self, a: Self::Item) -> crate::error::Result<()>
         where
-            Self::Item: Clone + 'static,
+            Self::Item: 'static,
         {
             self.produce(a).await?;
             Ok(())

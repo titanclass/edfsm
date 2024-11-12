@@ -134,7 +134,7 @@ where
     where
         T: Adapter<Item = Event<M>>,
         N: Adapter<Item = Event<M>>,
-        Event<M>: Send,
+        Event<M>: Send + Clone,
     {
         Machine {
             state: self.state,
@@ -154,7 +154,7 @@ where
     where
         T: Adapter<Item = Out<M>>,
         O: Adapter<Item = Out<M>>,
-        Out<M>: Send,
+        Out<M>: Send + Clone,
     {
         Machine {
             state: self.state,
@@ -230,7 +230,7 @@ where
 
     async fn notify(&mut self, a: Self::Item) -> Result<()>
     where
-        Self::Item: Clone + Send + 'static,
+        Self::Item: Send + 'static,
     {
         M::on_event(self.state, &a);
         Ok(())
