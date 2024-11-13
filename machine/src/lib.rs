@@ -242,14 +242,14 @@ mod commit_log {
     use crate::{Adapter, Drain, Effect, Event, Machine};
     use edfsm::Fsm;
     use futures_util::StreamExt;
-    use streambed_machine::{Codec, CommitLog, LogAdapter, RecordKey};
+    use streambed_machine::{Codec, CommitLog, LogAdapter};
 
     impl<M, N, O> Machine<M, N, O>
     where
         M: Fsm,
         Effect<M>: Drain,
         N: Adapter<Item = Event<M>>,
-        Event<M>: Send + Sync + RecordKey + Clone + 'static,
+        Event<M>: Send + Sync + Clone + 'static,
     {
         /// Connect this Fsm to a streambed `CommitLog` and initialise its state.
         pub async fn initialise<L, C>(

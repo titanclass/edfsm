@@ -230,13 +230,13 @@ pub mod adapt_tokio {
 #[cfg(feature = "streambed")]
 mod adapt_streambed {
     use crate::adapter::Adapter;
-    use streambed_machine::{Codec, CommitLog, LogAdapter, RecordKey};
+    use streambed_machine::{Codec, CommitLog, LogAdapter};
 
     impl<L, C, A> Adapter for LogAdapter<L, C, A>
     where
         C: Codec<A> + Sync + Send,
         L: CommitLog + Sync + Send,
-        A: RecordKey + Send + Sync + Clone,
+        A: Send + Sync + Clone,
     {
         type Item = A;
 

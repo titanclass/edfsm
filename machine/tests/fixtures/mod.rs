@@ -1,6 +1,5 @@
 use edfsm::{Change, Drain, Fsm, Init, Terminating};
 use serde::{Deserialize, Serialize};
-use streambed_machine::RecordKey;
 
 pub struct Counter;
 
@@ -14,12 +13,6 @@ pub enum Command {
 pub enum Event {
     Tick,
     Reset,
-}
-
-impl RecordKey for Event {
-    fn record_key(&self) -> u64 {
-        0
-    }
 }
 
 #[derive(Clone, Debug)]

@@ -11,11 +11,6 @@ use streambed::{
 
 pub use streambed::commit_log::{CommitLog, ProducerError};
 
-/// Provides a key for an item that will be stored in the log record.
-pub trait RecordKey {
-    fn record_key(&self) -> u64;
-}
-
 /// Wraps a `CommitLog` and specializes it for a specific payload type.
 /// This adds the type, topic and the encoding and encryption scheme.
 #[derive(Debug)]
@@ -57,11 +52,10 @@ impl<L, C, A> LogAdapter<L, C, A>
 where
     L: CommitLog,
     C: Codec<A>,
-    A: RecordKey + Clone + 'static,
+    A: Clone + 'static,
 {
     /// Send one item to the underlying commit log.
     pub async fn produce(&self, item: A) -> Result<Offset, ProducerError> {
-        let key = item.record_key();
         let topic = self.topic.clone();
 
         if let Some(value) = self.codec.encode(item).await {
@@ -70,7 +64,7 @@ where
                     topic,
                     headers: Vec::new(),
                     timestamp: None,
-                    key,
+                    key: 0,
                     value,
                     partition: 0,
                 })
@@ -187,7 +181,7 @@ where
 #[cfg(test)]
 mod test {
 
-    use crate::{Cbor, CborEncrypted, CommitLogExt, RecordKey};
+    use crate::{Cbor, CborEncrypted, CommitLogExt};
     use futures_util::StreamExt;
     use serde::{Deserialize, Serialize};
     use std::path::Path;
@@ -204,12 +198,6 @@ mod test {
     #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
     pub enum Event {
         Num(u32),
-    }
-
-    impl RecordKey for Event {
-        fn record_key(&self) -> u64 {
-            0
-        }
     }
 
     fn fixture_store() -> FileSecretStore {
