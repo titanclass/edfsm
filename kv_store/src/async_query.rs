@@ -1,5 +1,3 @@
-#![cfg(feature = "tokio")]
-
 use crate::{Path, Query, RespondMany, RespondOne};
 use alloc::boxed::Box;
 use core::ops::Bound;
