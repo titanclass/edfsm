@@ -3,6 +3,7 @@ use alloc::{
     vec::Vec,
 };
 use derive_more::derive::From;
+use smol_str::SmolStr;
 
 /// The key to a KV store is a pathname, `Path`, and allows heirarchical grouping of values.
 /// A path can be constructed with an expression such as:
@@ -47,11 +48,11 @@ impl Path {
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From)]
 pub enum PathItem {
     Number(u64),
-    Name(String),
+    Name(SmolStr),
 }
 
-impl From<&str> for PathItem {
-    fn from(value: &str) -> Self {
-        value.to_string().into()
+impl From<&'static str> for PathItem {
+    fn from(value: &'static str) -> Self {
+        SmolStr::new_static(value).into()
     }
 }
