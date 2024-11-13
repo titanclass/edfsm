@@ -1,6 +1,7 @@
-use crate::{Path, Query, RespondMany, RespondOne};
+use crate::{Keyed, Path, Query, RespondMany, RespondOne};
 use alloc::boxed::Box;
 use core::ops::Bound;
+use edfsm::Input;
 use machine::{adapter::Adapter, error::Result};
 use tokio::sync::oneshot;
 
@@ -13,9 +14,11 @@ pub fn requester<T>(sender: T) -> Requester<T> {
 #[derive(Debug)]
 pub struct Requester<T>(T);
 
-impl<T, V> Requester<T>
+impl<T, V, E> Requester<T>
 where
-    T: Adapter<Item = Query<V>>,
+    T: Adapter<Item = Input<Query<V>, Keyed<E>>>,
+    V: 'static,
+    E: 'static,
 {
     /// Get the value at the given path.
     /// Apply `func` to this and return the result.
@@ -23,11 +26,10 @@ where
     where
         F: FnOnce(Option<&V>) -> R + Send + 'static,
         R: Send + 'static,
-        V: 'static,
     {
         let (sender, receiver) = oneshot::channel::<R>();
         let q = Query::Get(path, respond_one(func, sender));
-        self.0.notify(q).await?;
+        self.0.notify(Input::Command(q)).await?;
         Ok(receiver.await?)
     }
 
@@ -38,7 +40,6 @@ where
     where
         F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
-        V: 'static,
     {
         self.dispatch_many_valued(|r| Query::GetTree(path, r), func)
             .await
@@ -50,7 +51,6 @@ where
     where
         F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
-        V: 'static,
     {
         self.dispatch_many_valued(|r| Query::GetRange(range, r), func)
             .await
@@ -62,7 +62,6 @@ where
     where
         F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
-        V: 'static,
     {
         self.dispatch_many_valued(Query::GetAll, func).await
     }
@@ -72,11 +71,10 @@ where
         Q: FnOnce(RespondMany<V>) -> Query<V>,
         F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
-        V: 'static,
     {
         let (sender, receiver) = oneshot::channel::<R>();
         let q = query(respond_many(func, sender));
-        self.0.notify(q).await?;
+        self.0.notify(Input::Command(q)).await?;
         Ok(receiver.await?)
     }
 }

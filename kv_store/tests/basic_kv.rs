@@ -2,7 +2,7 @@ pub mod fixtures;
 use edfsm::Input;
 use fixtures::{Counter, Event, Output, State};
 use kv_store::{requester, Keyed, KvStore, Path, Query};
-use machine::{adapter::Adapter, error::Result, Machine};
+use machine::{error::Result, Machine};
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     task::JoinSet,
@@ -31,7 +31,7 @@ async fn consumer(mut receiver: Receiver<Keyed<Output>>) -> Result<()> {
 }
 
 async fn asker(sender: Sender<Input<Query<State>, Keyed<Event>>>) -> Result<()> {
-    let mut r = requester(sender.clone().adapt_map(Input::Command));
+    let mut r = requester(sender);
 
     let n = r.get(Path::root(), |s| s.unwrap().count).await?;
     println!("The root element state is {n}");
