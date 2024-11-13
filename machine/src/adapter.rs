@@ -47,7 +47,7 @@ pub trait Adapter: Send {
 
     /// Create an adapter that maps items with an optional function.
     /// `Some` values are passed on, analogous to `Iterator::filter_map`.
-    fn adapt_filter_map<A>(
+    fn with_filter_map<A>(
         self,
         func: impl Fn(A) -> Option<Self::Item> + Send,
     ) -> impl Adapter<Item = A>
@@ -64,34 +64,35 @@ pub trait Adapter: Send {
     }
 
     /// Create an adapter that maps each item with a function.
-    fn adapt_map<A>(self, func: impl Fn(A) -> Self::Item + Send) -> impl Adapter<Item = A>
+    fn with_map<A>(self, func: impl Fn(A) -> Self::Item + Send) -> impl Adapter<Item = A>
     where
         Self: Sized + Send,
         Self::Item: Send + 'static,
         A: Send,
     {
-        self.adapt_filter_map(move |a| Some(func(a)))
+        self.with_filter_map(move |a| Some(func(a)))
     }
 
     /// Create an adapter that converts each item from another type.
-    fn adapt_into<A>(self) -> impl Adapter<Item = A>
+    /// This relies on an `Into` implementation for the conversion.
+    fn adapt<A>(self) -> impl Adapter<Item = A>
     where
         Self: Sized + Send,
         Self::Item: Send + 'static,
         A: Into<Self::Item> + Send,
     {
-        self.adapt_filter_map::<A>(move |a| Some(a.into()))
+        self.with_filter_map::<A>(move |a| Some(a.into()))
     }
 
     /// Create an adapter that fallibly converts each item from another type.
-    /// Items are passed on if conversion suceeds.
-    fn adapt_try_into<A>(self) -> impl Adapter<Item = A>
+    /// This relies on an `TryInto` implementation for the conversion.
+    fn adapt_fallible<A>(self) -> impl Adapter<Item = A>
     where
         Self: Sized + Send,
         Self::Item: Send + 'static,
         A: TryInto<Self::Item> + Send,
     {
-        self.adapt_filter_map::<A>(move |a| a.try_into().ok())
+        self.with_filter_map::<A>(move |a| a.try_into().ok())
     }
 }
 
