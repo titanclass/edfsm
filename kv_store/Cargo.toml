@@ -26,4 +26,4 @@ serde = "1"
 default = ["tokio"]
 tokio = ["dep:tokio", "dep:machine", "std"]
 embassy = ["dep:embassy-sync"]
-std = ["smol_str?/std"]
+std = ["smol_str/std"]
