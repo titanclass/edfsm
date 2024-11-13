@@ -174,7 +174,7 @@ where
     }
 
     async fn decode(&self, bytes: &mut [u8]) -> Option<A> {
-        ciborium::de::from_reader::<A, &[u8]>(&bytes).ok()
+        ciborium::de::from_reader::<A, &[u8]>(bytes).ok()
     }
 }
 
