@@ -1,7 +1,7 @@
 pub mod fixtures;
 use edfsm::Input;
 use fixtures::{Counter, Event, Output, State};
-use kv_store::{ask, Keyed, KvStore, Path, Query};
+use kv_store::{requester, Keyed, KvStore, Path, Query};
 use machine::{adapter::Adapter, error::Result, Machine};
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
@@ -31,12 +31,12 @@ async fn consumer(mut receiver: Receiver<Keyed<Output>>) -> Result<()> {
 }
 
 async fn asker(sender: Sender<Input<Query<State>, Keyed<Event>>>) -> Result<()> {
-    let mut a = ask(sender.adapt_map(Input::Command));
+    let mut r = requester(sender.clone().adapt_map(Input::Command));
 
-    let n = a.get(Path::root(), |s| s.unwrap().count).await?;
+    let n = r.get(Path::root(), |s| s.unwrap().count).await?;
     println!("The root element state is {n}");
 
-    let n = a.get_all(|ss| ss.fold(0, |t, (_p, s)| t + s.count)).await?;
+    let n = r.get_all(|ss| ss.fold(0, |t, (_p, s)| t + s.count)).await?;
     println!("The sum of all element states {n}");
     Ok(())
 }

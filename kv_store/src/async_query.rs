@@ -7,15 +7,15 @@ use machine::{adapter::Adapter, error::Result};
 use tokio::sync::oneshot;
 
 /// Initiate an async `kv_store` `Query` on the given channel or adapter
-pub fn ask<T>(sender: T) -> Ask<T> {
-    Ask(sender)
+pub fn requester<T>(sender: T) -> Requester<T> {
+    Requester(sender)
 }
 
 /// A target for `kv_store` `Query`s
 #[derive(Debug)]
-pub struct Ask<T>(T);
+pub struct Requester<T>(T);
 
-impl<T, V> Ask<T>
+impl<T, V> Requester<T>
 where
     T: Adapter<Item = Query<V>>,
 {

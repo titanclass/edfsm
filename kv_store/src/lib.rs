@@ -6,7 +6,7 @@ pub use path::Path;
 #[cfg(feature = "tokio")]
 pub mod async_query;
 #[cfg(feature = "tokio")]
-pub use async_query::{ask, Ask};
+pub use async_query::{requester, Requester};
 
 extern crate alloc;
 use alloc::{
@@ -125,13 +125,10 @@ where
     }
 
     fn on_change(r: &Self::S, e: &Self::E, se: &mut Self::SE, change: Change) {
-        let mut f = || {
-            let s = r.0.get(&e.key)?;
+        if let Some(s) = r.0.get(&e.key) {
             se.key = e.key.clone();
             M::on_change(s, &e.item, &mut se.item, change);
-            Some(())
-        };
-        f();
+        }
     }
 }
 
