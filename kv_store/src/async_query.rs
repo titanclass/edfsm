@@ -4,12 +4,12 @@ use core::ops::Bound;
 use machine::{adapter::Adapter, error::Result};
 use tokio::sync::oneshot;
 
-/// Initiate an async `kv_store` `Query` on the given channel or adapter
+/// Create a handle for async queries on the given channel or adapter
 pub fn requester<T>(sender: T) -> Requester<T> {
     Requester(sender)
 }
 
-/// A target for `kv_store` `Query`s
+/// A handle for async queries to a `kv_store`
 #[derive(Debug)]
 pub struct Requester<T>(T);
 
