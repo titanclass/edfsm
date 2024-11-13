@@ -1,5 +1,6 @@
 use alloc::vec::Vec;
 use derive_more::derive::From;
+use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
 /// The key to a KV store is a pathname, `Path`, and allows heirarchical grouping of values.
@@ -8,7 +9,7 @@ use smol_str::SmolStr;
 ///  `Path::root().append("first_level").append(42),append("third_level")`
 ///
 /// or imperatively using `path.push(item)`.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Serialize, Deserialize)]
 pub struct Path {
     items: Vec<PathItem>,
 }
@@ -42,7 +43,7 @@ impl Path {
 }
 
 /// One element of a `Path` can be a number or a name.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From, Serialize, Deserialize)]
 pub enum PathItem {
     Number(u64),
     Name(SmolStr),

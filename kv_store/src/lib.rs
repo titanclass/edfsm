@@ -15,6 +15,7 @@ use alloc::{
 };
 use core::{clone::Clone, ops::Bound};
 use edfsm::{Change, Drain, Fsm, Init, Input, Terminating};
+use serde::{Deserialize, Serialize};
 
 /// The event type of an Fsm
 pub type Event<M> = <M as Fsm>::E;
@@ -135,7 +136,7 @@ where
 /// This type pairs a `Path` with another value.
 /// This may be an event or output of a state machine
 /// in the KvStore.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Keyed<A> {
     pub key: Path,
     pub item: A,
