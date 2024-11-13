@@ -217,7 +217,7 @@ mod test {
     }
 
     fn fixture_data() -> impl Iterator<Item = Event> {
-        (1..100).into_iter().map(Event::Num)
+        (1..100).map(Event::Num)
     }
 
     #[tokio::test]
