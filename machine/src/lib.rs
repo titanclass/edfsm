@@ -5,6 +5,9 @@ extern crate std;
 pub mod adapter;
 pub mod error;
 
+#[cfg(feature = "std")]
+pub mod output;
+
 use crate::{
     adapter::{Adapter, Discard},
     error::Result,
