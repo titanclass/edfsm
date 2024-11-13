@@ -33,9 +33,9 @@ pub trait Adapter: Send {
     }
 
     /// Combine this with another adapter. The notify call is delegated to both adapters.
-    fn merge<T>(self, other: T) -> impl Adapter<Item = Self::Item> + Send
+    fn merge<T>(self, other: T) -> impl Adapter<Item = Self::Item>
     where
-        T: Adapter<Item = Self::Item> + Send,
+        T: Adapter<Item = Self::Item>,
         Self: Sized + Send,
         Self::Item: Send + Clone,
     {
@@ -50,7 +50,7 @@ pub trait Adapter: Send {
     fn adapt_filter_map<A>(
         self,
         func: impl Fn(A) -> Option<Self::Item> + Send,
-    ) -> impl Adapter<Item = A> + Send
+    ) -> impl Adapter<Item = A>
     where
         Self: Sized + Send,
         Self::Item: Send + 'static,
@@ -64,7 +64,7 @@ pub trait Adapter: Send {
     }
 
     /// Create an adapter that maps each item with a function.
-    fn adapt_map<A>(self, func: impl Fn(A) -> Self::Item + Send) -> impl Adapter<Item = A> + Send
+    fn adapt_map<A>(self, func: impl Fn(A) -> Self::Item + Send) -> impl Adapter<Item = A>
     where
         Self: Sized + Send,
         Self::Item: Send + 'static,
@@ -74,7 +74,7 @@ pub trait Adapter: Send {
     }
 
     /// Create an adapter that converts each item from another type.
-    fn adapt_into<A>(self) -> impl Adapter<Item = A> + Send
+    fn adapt_into<A>(self) -> impl Adapter<Item = A>
     where
         Self: Sized + Send,
         Self::Item: Send + 'static,
@@ -85,7 +85,7 @@ pub trait Adapter: Send {
 
     /// Create an adapter that fallibly converts each item from another type.
     /// Items are passed on if conversion suceeds.
-    fn adapt_try_into<A>(self) -> impl Adapter<Item = A> + Send
+    fn adapt_try_into<A>(self) -> impl Adapter<Item = A>
     where
         Self: Sized + Send,
         Self::Item: Send + 'static,
