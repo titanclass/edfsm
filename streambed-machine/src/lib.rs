@@ -94,9 +94,9 @@ where
 
         Box::pin(stream! {
             if let Some(last_offset) = last_offset {
-                while let Some(r) = records.next().await {
+                while let Some(mut r) = records.next().await {
                     if r.offset <= last_offset {
-                        if let Some(item) = self.codec.decode(r.value).await {
+                        if let Some(item) = self.codec.decode(&mut r.value).await {
                             yield item;
                         }
                         if r.offset == last_offset {
@@ -134,7 +134,7 @@ where
 /// A trait for asyncronous codecs.
 pub trait Codec<A> {
     fn encode(&self, item: A) -> impl Future<Output = Option<Vec<u8>>> + Send;
-    fn decode(&self, bytes: Vec<u8>) -> impl Future<Output = Option<A>> + Send;
+    fn decode(&self, bytes: &mut [u8]) -> impl Future<Output = Option<A>> + Send;
 }
 
 impl<S, A> Codec<A> for CborEncrypted<S>
@@ -151,8 +151,8 @@ where
         encrypt_struct_with_secret(secret_value, serialize, thread_rng, &item)
     }
 
-    async fn decode(&self, mut bytes: Vec<u8>) -> Option<A> {
-        decrypt_buf(&self.secret_store, &self.secret_path, &mut bytes, |b| {
+    async fn decode(&self, bytes: &mut [u8]) -> Option<A> {
+        decrypt_buf(&self.secret_store, &self.secret_path, bytes, |b| {
             ciborium::de::from_reader::<A, _>(b)
         })
         .await
@@ -173,7 +173,7 @@ where
         Some(buf)
     }
 
-    async fn decode(&self, bytes: Vec<u8>) -> Option<A> {
+    async fn decode(&self, bytes: &mut [u8]) -> Option<A> {
         ciborium::de::from_reader::<A, &[u8]>(&bytes).ok()
     }
 }
