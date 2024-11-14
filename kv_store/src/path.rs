@@ -9,7 +9,7 @@ use smol_str::SmolStr;
 ///  `Path::root().append("first_level").append(42),append("third_level")`
 ///
 /// or imperatively using `path.push(item)`.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Serialize, Deserialize, Hash)]
 pub struct Path {
     items: Vec<PathItem>,
 }
@@ -43,7 +43,7 @@ impl Path {
 }
 
 /// One element of a `Path` can be a number or a name.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From, Serialize, Deserialize, Hash)]
 pub enum PathItem {
     Number(u64),
     Name(SmolStr),
