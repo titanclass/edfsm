@@ -32,7 +32,7 @@ where
     /// for encoding and decoding values of type `A`.
     fn adapt<A>(
         self,
-        topic: &str,
+        topic: impl Into<Topic>,
         group: &str,
         codec: impl Codec<A>,
     ) -> LogAdapter<Self, impl Codec<A>, A> {
@@ -40,7 +40,7 @@ where
             commit_log: self,
             codec,
             topic: topic.into(),
-            group: group.into(),
+            group: group.to_string(),
             marker: PhantomData,
         }
     }
