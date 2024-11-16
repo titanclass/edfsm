@@ -74,7 +74,7 @@ where
     where
         F: FnOnce(Option<&V>) -> E + Send + 'static,
     {
-        let (remote, receiver) = respond_one(|v: Option<&V>| {
+        let (remote, receiver) = respond_one(|v| {
             let x = v.is_some().into();
             (x, func(v))
         });
