@@ -119,12 +119,16 @@ mod test {
         // other slice operations
         if let Some(&PathItem::Number(evse)) = path.last() {
             assert_eq!(evse, 2);
+        } else {
+            panic!("test failed")
         }
 
         // pattern matching
-        match *path {
-            [_, PathItem::Number(csms), ..] => assert_eq!(csms, 65),
-            _ => (),
+        match &*path {
+            [PathItem::Name(x), PathItem::Number(csms), ..] if x == "CSMS" => {
+                assert_eq!(*csms, 65)
+            }
+            _ => panic!("test failed"),
         }
 
         // iterating
