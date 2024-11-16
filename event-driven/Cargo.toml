@@ -1,8 +1,8 @@
 [package]
 name = "edfsm"
+description = "Event Driven Finite State Machine library"
+readme = "README.md"
 
-description.workspace = true
-readme.workspace = true
 version.workspace = true
 edition.workspace = true
 license.workspace = true
