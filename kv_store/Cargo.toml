@@ -26,6 +26,8 @@ serde = { version = "1", features = ["derive"] }
 machine.workspace = true
 tokio = { version = "1", features = ["full"] }
 serde = "1"
+serde_json = "1"
+serde_qs = "0.13"
 
 [features]
 default = ["tokio"]

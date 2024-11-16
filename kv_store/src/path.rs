@@ -28,9 +28,7 @@ use smol_str::SmolStr;
     Deref,
 )]
 #[deref(forward)]
-pub struct Path {
-    items: Vec<PathItem>,
-}
+pub struct Path(Vec<PathItem>);
 
 impl Path {
     /// Another name for the empty path, also the default path.
@@ -46,21 +44,21 @@ impl Path {
 
     /// Push a `PathItem` to the end of this path
     pub fn push(&mut self, item: PathItem) {
-        self.items.push(item);
+        self.0.push(item);
     }
 
     /// The length of this path.
     pub fn len(&self) -> usize {
-        self.items.len()
+        self.0.len()
     }
 
     /// This is the empty or root path.
     pub fn is_empty(&self) -> bool {
-        self.items.is_empty()
+        self.0.is_empty()
     }
 
     pub fn iter(&self) -> Iter<'_, PathItem> {
-        self.items.iter()
+        self.0.iter()
     }
 }
 
@@ -84,6 +82,7 @@ where
 #[derive(
     PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From, Serialize, Deserialize, Hash, TryInto,
 )]
+#[serde(untagged)]
 pub enum PathItem {
     Number(u64),
     Name(SmolStr),
@@ -103,7 +102,7 @@ impl From<String> for PathItem {
 
 #[cfg(test)]
 mod test {
-    use super::{root, PathItem};
+    use super::{root, Path, PathItem};
     use alloc::format;
 
     #[test]
@@ -149,5 +148,26 @@ mod test {
                 break;
             }
         }
+    }
+
+    #[test]
+    fn path_serialisation_json() {
+        let p = root() / "CSMS" / 65 / "EVSE" / 2;
+        let s = serde_json::to_string(&p).unwrap();
+        assert_eq!(s, r#"["CSMS",65,"EVSE",2]"#);
+    }
+
+    #[test]
+    fn path_deserialisation_json() {
+        let s = r#"["CSMS",65,"EVSE",2]"#;
+        let p: Path = serde_json::from_str(s).unwrap();
+        assert_eq!(p, root() / "CSMS" / 65 / "EVSE" / 2);
+    }
+
+    #[test]
+    fn path_serialisation_qs() {
+        let p = root() / "CSMS" / 65 / "EVSE" / 2;
+        let s = serde_qs::to_string(&p).unwrap();
+        assert_eq!(s, "0=CSMS&1=65&2=EVSE&3=2");
     }
 }
