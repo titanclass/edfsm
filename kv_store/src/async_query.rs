@@ -66,6 +66,10 @@ where
         self.dispatch(Query::GetAll(remote), receiver).await
     }
 
+    /// Get the value at the given path, or none, and apply a function that produces an event.
+    ///
+    /// The event will be applied to the extant value or a new value at the path.
+    /// The result indicates whether an extant value was found.
     pub async fn upsert<F>(&mut self, path: Path, func: F) -> Result<Extant>
     where
         F: FnOnce(Option<&V>) -> E + Send + 'static,
@@ -77,6 +81,11 @@ where
         self.dispatch(Query::Upsert(path, remote), receiver).await
     }
 
+    /// Get all the entries and apply a function that produces an event.
+    ///
+    /// The event is keyed for a particular path. Usually this would be a new path
+    /// not found among the extant entries and new value will be created.
+    /// The event will applied to the new or extant value. The path is returned.
     pub async fn insert<F>(&mut self, func: F) -> Result<Path>
     where
         F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> Keyed<E> + Send + 'static,
