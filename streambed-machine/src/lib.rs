@@ -18,7 +18,6 @@ pub struct LogAdapter<L, C, A> {
     commit_log: L,
     codec: C,
     topic: Topic,
-    group: String,
     marker: PhantomData<A>,
 }
 
@@ -33,14 +32,12 @@ where
     fn adapt<A>(
         self,
         topic: impl Into<Topic>,
-        group: &str,
         codec: impl Codec<A>,
     ) -> LogAdapter<Self, impl Codec<A>, A> {
         LogAdapter {
             commit_log: self,
             codec,
             topic: topic.into(),
-            group: group.to_string(),
             marker: PhantomData,
         }
     }
@@ -90,7 +87,7 @@ where
 
         let mut records =
             self.commit_log
-                .scoped_subscribe(&self.group, Vec::new(), subscriptions, None);
+                .scoped_subscribe("EDFSM", Vec::new(), subscriptions, None);
 
         Box::pin(stream! {
             if let Some(last_offset) = last_offset {
@@ -210,7 +207,7 @@ mod test {
         cbor_produce().await;
         // sleep(Duration::from_secs(1)).await;
         let mut data = fixture_data();
-        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", Cbor);
+        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, Cbor);
         let mut history = log.history().await;
         while let Some(event) = history.next().await {
             println!("{event:?}");
@@ -223,7 +220,7 @@ mod test {
         let topic_file = [TEST_DATA, TOPIC].join("/");
         let _ = std::fs::remove_file(&topic_file);
         let _ = std::fs::create_dir(TEST_DATA);
-        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", Cbor);
+        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, Cbor);
         for e in fixture_data() {
             log.produce(e).await.expect("failed to produce a log entry");
         }
@@ -243,7 +240,7 @@ mod test {
         let codec = CborEncrypted::new(&fixture_store(), "secret_path")
             .await
             .unwrap();
-        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", codec);
+        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, codec);
         let mut history = log.history().await;
         while let Some(event) = history.next().await {
             println!("{event:?}")
@@ -256,7 +253,7 @@ mod test {
         let codec = CborEncrypted::new(&fixture_store(), "secret_path")
             .await
             .unwrap();
-        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", codec);
+        let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, codec);
         for i in 1..100 {
             let _ = log.produce(Event::Num(i)).await;
         }
