@@ -8,7 +8,10 @@ use tokio::{
     task::JoinSet,
 };
 
-async fn producer(sender: Sender<Input<Query<State>, Keyed<Event>>>, count: i32) -> Result<()> {
+async fn producer(
+    sender: Sender<Input<Query<State, Event>, Keyed<Event>>>,
+    count: i32,
+) -> Result<()> {
     for _ in 0..count {
         sender
             .send(Input::Event(Keyed {
@@ -30,7 +33,7 @@ async fn consumer(mut receiver: Receiver<Keyed<Output>>, expect: i32) -> Result<
     Ok(())
 }
 
-async fn asker(sender: Sender<Input<Query<State>, Keyed<Event>>>) -> Result<()> {
+async fn asker(sender: Sender<Input<Query<State, Event>, Keyed<Event>>>) -> Result<()> {
     let mut r = requester(sender);
 
     if let Some(n) = r.get(Path::root(), |s| s.map(|s| s.count)).await? {

@@ -44,26 +44,34 @@ pub type State<M> = <M as Fsm>::S;
 /// other data structures.  The respond function may clone these to pass them on,
 /// or the function may interpret or aggregate borrowed values in place.
 ///
-pub enum Query<V> {
-    /// Get the value at the given path
-    Get(Path, RespondOne<V>),
+pub enum Query<V, E> {
+    /// Get the value at the given path, or None.
+    Get(Path, RespondOne<V, ()>),
 
     /// Get the entries whose path starts with the given path,
     /// including the entry for the path itself.
-    GetTree(Path, RespondMany<V>),
+    GetTree(Path, RespondMany<V, ()>),
 
     /// Get the entries in the given range
-    GetRange((Bound<Path>, Bound<Path>), RespondMany<V>),
+    GetRange((Bound<Path>, Bound<Path>), RespondMany<V, ()>),
 
     /// Get all the entries
-    GetAll(RespondMany<V>),
+    GetAll(RespondMany<V, ()>),
+
+    /// Get the value at the given path or None and emit an event for that path.
+    /// A value will then exist at that path.
+    Upsert(Path, RespondOne<V, E>),
+
+    /// Get all the entries and emit an event for a particular path.
+    /// A value will then exist at that path.
+    Insert(RespondMany<V, Keyed<E>>),
 }
 
-/// Type of a function that will respond to an iterator over query results.
-type RespondMany<V> = Box<dyn FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) + Send>;
+/// Type of a function that will respond to an many-valued query.
+type RespondMany<V, E> = Box<dyn FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> E + Send>;
 
-/// Type of a function that will respond to a single valued query response
-type RespondOne<V> = Box<dyn FnOnce(Option<&V>) + Send>;
+/// Type of a function that will respond to a single valued query.
+type RespondOne<V, E> = Box<dyn FnOnce(Option<&V>) -> E + Send>;
 
 /// `KvStore<M>` represents the collection of state machines of type `M`.
 ///
@@ -85,7 +93,7 @@ where
     Effect<M>: Drain,
 {
     type S = Self;
-    type C = Query<State<M>>;
+    type C = Query<State<M>, Event<M>>;
     type E = Keyed<Event<M>>;
     type SE = Keyed<Effect<M>>;
 
@@ -93,17 +101,36 @@ where
         use Bound::*;
         use Query::*;
         match command {
-            Get(path, respond) => respond(store.0.get(&path)),
-            GetTree(path, respond) => respond(
-                &mut (store
-                    .0
-                    .range((Included(&path), Unbounded))
-                    .take_while(|(p, _)| p.len() > path.len() || *p == &path)),
-            ),
-            GetRange(bounds, respond) => respond(&mut store.0.range(bounds)),
-            GetAll(respond) => respond(&mut store.0.iter()),
+            Get(path, respond) => {
+                respond(store.0.get(&path));
+                None
+            }
+            GetTree(path, respond) => {
+                respond(
+                    &mut (store
+                        .0
+                        .range((Included(&path), Unbounded))
+                        .take_while(|(p, _)| p.len() > path.len() || *p == &path)),
+                );
+                None
+            }
+            GetRange(bounds, respond) => {
+                respond(&mut store.0.range(bounds));
+                None
+            }
+            GetAll(respond) => {
+                respond(&mut store.0.iter());
+                None
+            }
+            Upsert(path, respond) => {
+                let e = respond(store.0.get(&path));
+                Some(Keyed { key: path, item: e })
+            }
+            Insert(respond) => {
+                let e = respond(&mut store.0.iter());
+                Some(e)
+            }
         }
-        None
     }
 
     fn on_event(r: &mut Self::S, e: &Self::E) -> Option<Change> {

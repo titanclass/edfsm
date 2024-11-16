@@ -16,7 +16,7 @@ pub struct Requester<T>(T);
 
 impl<T, V, E> Requester<T>
 where
-    T: Adapter<Item = Input<Query<V>, Keyed<E>>>,
+    T: Adapter<Item = Input<Query<V, E>, Keyed<E>>>,
     V: 'static,
     E: 'static,
 {
@@ -66,9 +66,39 @@ where
         self.dispatch_many_valued(Query::GetAll, func).await
     }
 
+    pub async fn upsert<F>(&mut self, path: Path, func: F) -> Result<Extant>
+    where
+        F: FnOnce(Option<&V>) -> E + Send + 'static,
+    {
+        let (sender, receiver) = oneshot::channel();
+        let r = Box::new(|v: Option<&V>| {
+            let x = v.is_some().into();
+            let _ = sender.send(x);
+            func(v)
+        });
+        let q = Query::Upsert(path, r);
+        self.0.notify(Input::Command(q)).await?;
+        Ok(receiver.await?)
+    }
+
+    pub async fn insert<F>(&mut self, func: F) -> Result<Path>
+    where
+        F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> Keyed<E> + Send + 'static,
+    {
+        let (sender, receiver) = oneshot::channel::<Path>();
+        let r = Box::new(|vs: &mut dyn Iterator<Item = (&Path, &V)>| {
+            let e = func(vs);
+            let _ = sender.send(e.key.clone());
+            e
+        });
+        let q = Query::Insert(r);
+        self.0.notify(Input::Command(q)).await?;
+        Ok(receiver.await?)
+    }
+
     async fn dispatch_many_valued<Q, F, R>(&mut self, query: Q, func: F) -> Result<R>
     where
-        Q: FnOnce(RespondMany<V>) -> Query<V>,
+        Q: FnOnce(RespondMany<V, ()>) -> Query<V, E>,
         F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
     {
@@ -79,7 +109,23 @@ where
     }
 }
 
-fn respond_one<F, V, R>(func: F, sender: oneshot::Sender<R>) -> RespondOne<V>
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Extant {
+    Found,
+    NotFound,
+}
+
+impl From<bool> for Extant {
+    fn from(value: bool) -> Self {
+        if value {
+            Extant::Found
+        } else {
+            Extant::NotFound
+        }
+    }
+}
+
+fn respond_one<F, V, R>(func: F, sender: oneshot::Sender<R>) -> RespondOne<V, ()>
 where
     F: FnOnce(Option<&V>) -> R + Send + 'static,
     R: Send + 'static,
@@ -89,7 +135,7 @@ where
     })
 }
 
-fn respond_many<F, V, R>(func: F, sender: oneshot::Sender<R>) -> RespondMany<V>
+fn respond_many<F, V, R>(func: F, sender: oneshot::Sender<R>) -> RespondMany<V, ()>
 where
     F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
     R: Send + 'static,
