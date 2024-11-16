@@ -27,10 +27,8 @@ where
         F: FnOnce(Option<&V>) -> R + Send + 'static,
         R: Send + 'static,
     {
-        let (sender, receiver) = oneshot::channel::<R>();
-        let q = Query::Get(path, respond_one(func, sender));
-        self.0.notify(Input::Command(q)).await?;
-        Ok(receiver.await?)
+        let (remote, receiver) = respond_one(|v| (func(v), ()));
+        self.dispatch(Query::Get(path, remote), receiver).await
     }
 
     /// Get the entries whose path starts with the given path,
@@ -41,8 +39,8 @@ where
         F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
     {
-        self.dispatch_many_valued(|r| Query::GetTree(path, r), func)
-            .await
+        let (remote, receiver) = respond_many(|vs| (func(vs), ()));
+        self.dispatch(Query::GetTree(path, remote), receiver).await
     }
 
     /// Get the entries in the given range
@@ -52,7 +50,8 @@ where
         F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
     {
-        self.dispatch_many_valued(|r| Query::GetRange(range, r), func)
+        let (remote, receiver) = respond_many(|vs| (func(vs), ()));
+        self.dispatch(Query::GetRange(range, remote), receiver)
             .await
     }
 
@@ -63,49 +62,35 @@ where
         F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
         R: Send + 'static,
     {
-        self.dispatch_many_valued(Query::GetAll, func).await
+        let (remote, receiver) = respond_many(|vs| (func(vs), ()));
+        self.dispatch(Query::GetAll(remote), receiver).await
     }
 
     pub async fn upsert<F>(&mut self, path: Path, func: F) -> Result<Extant>
     where
         F: FnOnce(Option<&V>) -> E + Send + 'static,
     {
-        let (sender, receiver) = oneshot::channel();
-        let r = Box::new(|v: Option<&V>| {
+        let (remote, receiver) = respond_one(|v: Option<&V>| {
             let x = v.is_some().into();
-            let _ = sender.send(x);
-            func(v)
+            (x, func(v))
         });
-        let q = Query::Upsert(path, r);
-        self.0.notify(Input::Command(q)).await?;
-        Ok(receiver.await?)
+        self.dispatch(Query::Upsert(path, remote), receiver).await
     }
 
     pub async fn insert<F>(&mut self, func: F) -> Result<Path>
     where
         F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> Keyed<E> + Send + 'static,
     {
-        let (sender, receiver) = oneshot::channel::<Path>();
-        let r = Box::new(|vs: &mut dyn Iterator<Item = (&Path, &V)>| {
+        let (remote, receiver) = respond_many(|vs| {
             let e = func(vs);
-            let _ = sender.send(e.key.clone());
-            e
+            (e.key.clone(), e)
         });
-        let q = Query::Insert(r);
-        self.0.notify(Input::Command(q)).await?;
-        Ok(receiver.await?)
+        self.dispatch(Query::Insert(remote), receiver).await
     }
 
-    async fn dispatch_many_valued<Q, F, R>(&mut self, query: Q, func: F) -> Result<R>
-    where
-        Q: FnOnce(RespondMany<V, ()>) -> Query<V, E>,
-        F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
-        R: Send + 'static,
-    {
-        let (sender, receiver) = oneshot::channel::<R>();
-        let q = query(respond_many(func, sender));
-        self.0.notify(Input::Command(q)).await?;
-        Ok(receiver.await?)
+    async fn dispatch<R>(&mut self, query: Query<V, E>, rx: oneshot::Receiver<R>) -> Result<R> {
+        self.0.notify(Input::Command(query)).await?;
+        Ok(rx.await?)
     }
 }
 
@@ -125,22 +110,30 @@ impl From<bool> for Extant {
     }
 }
 
-fn respond_one<F, V, R>(func: F, sender: oneshot::Sender<R>) -> RespondOne<V, ()>
+fn respond_one<F, V, R, E>(func: F) -> (RespondOne<V, E>, oneshot::Receiver<R>)
 where
-    F: FnOnce(Option<&V>) -> R + Send + 'static,
+    F: FnOnce(Option<&V>) -> (R, E) + Send + 'static,
     R: Send + 'static,
 {
-    Box::new(|v| {
-        let _ = sender.send(func(v));
-    })
+    let (sender, receiver) = oneshot::channel();
+    let remote = Box::new(|v: Option<&V>| {
+        let (r, e) = func(v);
+        let _ = sender.send(r);
+        e
+    });
+    (remote, receiver)
 }
 
-fn respond_many<F, V, R>(func: F, sender: oneshot::Sender<R>) -> RespondMany<V, ()>
+fn respond_many<F, V, R, E>(func: F) -> (RespondMany<V, E>, oneshot::Receiver<R>)
 where
-    F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> R + Send + 'static,
+    F: FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> (R, E) + Send + 'static,
     R: Send + 'static,
 {
-    Box::new(|vs| {
-        let _ = sender.send(func(vs));
-    })
+    let (sender, receiver) = oneshot::channel();
+    let remote = Box::new(|vs: &mut dyn Iterator<Item = (&Path, &V)>| {
+        let (r, e) = func(vs);
+        let _ = sender.send(r);
+        e
+    });
+    (remote, receiver)
 }
