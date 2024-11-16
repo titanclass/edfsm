@@ -103,6 +103,7 @@ where
     }
 }
 
+/// Indicates whether an extant (ie existing) value is found in a `KvStore`
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Extant {
     Found,
