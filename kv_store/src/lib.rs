@@ -38,8 +38,10 @@ pub type State<M> = <M as Fsm>::S;
 /// A query to the KV store.
 ///
 /// Type parameter `V` is the value type of the KV store. (The key type is `Path`.)
-/// The functions of type `RespondOne` and `RespondMany` are passed the query result.
+/// The parameter `E` is type for events that can update a value. In other words,
+/// the inner state machine at each Path receives events type `E` and manages state type `V`.
 ///
+/// The functions of type `RespondOne` and `RespondMany` are passed the query result.
 /// Results contain borrowed values `&V` which can't be passed to channels or
 /// other data structures.  The respond function may clone these to pass them on,
 /// or the function may interpret or aggregate borrowed values in place.
@@ -59,11 +61,9 @@ pub enum Query<V, E> {
     GetAll(RespondMany<V, ()>),
 
     /// Get the value at the given path or None and emit an event for that path.
-    /// A value will then exist at that path.
     Upsert(Path, RespondOne<V, E>),
 
-    /// Get all the entries and emit an event for a particular path.
-    /// A value will then exist at that path.
+    /// Get all the entries and emit an event for a particular (usually new) path.
     Insert(RespondMany<V, Keyed<E>>),
 }
 
