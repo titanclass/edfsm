@@ -1,5 +1,7 @@
+use core::slice::Iter;
+
 use alloc::vec::Vec;
-use derive_more::derive::From;
+use derive_more::derive::{From, TryInto};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
@@ -40,10 +42,25 @@ impl Path {
     pub fn is_empty(&self) -> bool {
         self.items.is_empty()
     }
+
+    pub fn iter(&self) -> Iter<'_, PathItem> {
+        self.items.iter()
+    }
+}
+
+impl IntoIterator for Path {
+    type Item = PathItem;
+    type IntoIter = <Vec<PathItem> as IntoIterator>::IntoIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.items.into_iter()
+    }
 }
 
 /// One element of a `Path` can be a number or a name.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From, Serialize, Deserialize, Hash)]
+#[derive(
+    PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From, Serialize, Deserialize, Hash, TryInto,
+)]
 pub enum PathItem {
     Number(u64),
     Name(SmolStr),
