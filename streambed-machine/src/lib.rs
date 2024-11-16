@@ -2,10 +2,10 @@ use async_stream::stream;
 use futures_util::{Stream, StreamExt};
 use rand::thread_rng;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{future::Future, marker::PhantomData, pin::Pin, vec::Vec};
+use std::{marker::PhantomData, pin::Pin, vec::Vec};
 use streambed::{
     commit_log::{Offset, ProducerRecord, Subscription, Topic},
-    decrypt_buf, encrypt_struct_with_secret, get_secret_value,
+    decrypt_buf_with_secret, encrypt_struct_with_secret, get_secret_value,
     secret_store::SecretStore,
 };
 
@@ -52,13 +52,13 @@ impl<L, C, A> LogAdapter<L, C, A>
 where
     L: CommitLog,
     C: Codec<A>,
-    A: Clone + 'static,
+    A: 'static,
 {
     /// Send one item to the underlying commit log.
     pub async fn produce(&self, item: A) -> Result<Offset, ProducerError> {
         let topic = self.topic.clone();
 
-        if let Some(value) = self.codec.encode(item).await {
+        if let Some(value) = self.codec.encode(item) {
             self.commit_log
                 .produce(ProducerRecord {
                     topic,
@@ -96,7 +96,7 @@ where
             if let Some(last_offset) = last_offset {
                 while let Some(mut r) = records.next().await {
                     if r.offset <= last_offset {
-                        if let Some(item) = self.codec.decode(&mut r.value).await {
+                        if let Some(item) = self.codec.decode(&mut r.value) {
                             yield item;
                         }
                         if r.offset == last_offset {
@@ -111,51 +111,48 @@ where
     }
 }
 
-/// A `Codec` for encripted CBOR
-#[derive(Debug)]
-pub struct CborEncrypted<S> {
-    secret_store: S,
-    secret_path: String,
+/// A trait for codecs for a specic type `A`, usually an event type stored on a CommitLog.
+pub trait Codec<A> {
+    /// Encode a value.
+    fn encode(&self, item: A) -> Option<Vec<u8>>;
+    /// Decode a value.
+    fn decode(&self, bytes: &mut [u8]) -> Option<A>;
 }
 
-impl<S> CborEncrypted<S>
-where
-    S: SecretStore,
-{
+/// A `Codec` for encripted CBOR
+#[derive(Debug)]
+pub struct CborEncrypted {
+    secret: String,
+}
+
+impl CborEncrypted {
     /// Create an encrypted CBOR codec with the given secret store.
-    pub fn new(secret_store: S, path: &str) -> Self {
-        Self {
-            secret_store,
-            secret_path: path.into(),
-        }
+    pub async fn new<S>(secret_store: &S, secret_path: &str) -> Option<Self>
+    where
+        S: SecretStore,
+    {
+        Some(Self {
+            secret: get_secret_value(secret_store, secret_path).await?,
+        })
     }
 }
 
-/// A trait for asyncronous codecs.
-pub trait Codec<A> {
-    fn encode(&self, item: A) -> impl Future<Output = Option<Vec<u8>>> + Send;
-    fn decode(&self, bytes: &mut [u8]) -> impl Future<Output = Option<A>> + Send;
-}
-
-impl<S, A> Codec<A> for CborEncrypted<S>
+impl<A> Codec<A> for CborEncrypted
 where
-    S: SecretStore,
     A: Serialize + DeserializeOwned + Send,
 {
-    async fn encode(&self, item: A) -> Option<Vec<u8>> {
-        let secret_value = get_secret_value(&self.secret_store, &self.secret_path).await?;
+    fn encode(&self, item: A) -> Option<Vec<u8>> {
         let serialize = |item: &A| {
             let mut buf = Vec::new();
             ciborium::ser::into_writer(item, &mut buf).map(|_| buf)
         };
-        encrypt_struct_with_secret(secret_value, serialize, thread_rng, &item)
+        encrypt_struct_with_secret(self.secret.clone(), serialize, thread_rng, &item)
     }
 
-    async fn decode(&self, bytes: &mut [u8]) -> Option<A> {
-        decrypt_buf(&self.secret_store, &self.secret_path, bytes, |b| {
+    fn decode(&self, bytes: &mut [u8]) -> Option<A> {
+        decrypt_buf_with_secret(self.secret.clone(), bytes, |b| {
             ciborium::de::from_reader::<A, _>(b)
         })
-        .await
     }
 }
 
@@ -167,13 +164,13 @@ impl<A> Codec<A> for Cbor
 where
     A: Serialize + DeserializeOwned + Send,
 {
-    async fn encode(&self, item: A) -> Option<Vec<u8>> {
+    fn encode(&self, item: A) -> Option<Vec<u8>> {
         let mut buf = Vec::new();
         ciborium::ser::into_writer(&item, &mut buf).ok()?;
         Some(buf)
     }
 
-    async fn decode(&self, bytes: &mut [u8]) -> Option<A> {
+    fn decode(&self, bytes: &mut [u8]) -> Option<A> {
         ciborium::de::from_reader::<A, &[u8]>(bytes).ok()
     }
 }
@@ -243,7 +240,9 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn cbor_encrypted_history() {
-        let codec = CborEncrypted::new(fixture_store(), "secret_path");
+        let codec = CborEncrypted::new(&fixture_store(), "secret_path")
+            .await
+            .unwrap();
         let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", codec);
         let mut history = log.history().await;
         while let Some(event) = history.next().await {
@@ -254,7 +253,9 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn cbor_encrypted_produce() {
-        let codec = CborEncrypted::new(fixture_store(), "secret_path");
+        let codec = CborEncrypted::new(&fixture_store(), "secret_path")
+            .await
+            .unwrap();
         let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", codec);
         for i in 1..100 {
             let _ = log.produce(Event::Num(i)).await;
