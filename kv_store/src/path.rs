@@ -1,7 +1,9 @@
-use core::slice::Iter;
-
-use alloc::vec::Vec;
-use derive_more::derive::{From, TryInto};
+use alloc::{string::String, vec::Vec};
+use core::{ops::Div, slice::Iter};
+use derive_more::{
+    derive::{Deref, IntoIterator},
+    From, TryInto,
+};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
 
@@ -11,7 +13,21 @@ use smol_str::SmolStr;
 ///  `Path::root().append("first_level").append(42),append("third_level")`
 ///
 /// or imperatively using `path.push(item)`.
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Debug, Default, Serialize, Deserialize, Hash)]
+#[derive(
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Clone,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    Hash,
+    IntoIterator,
+    Deref,
+)]
+#[deref(forward)]
 pub struct Path {
     items: Vec<PathItem>,
 }
@@ -48,12 +64,19 @@ impl Path {
     }
 }
 
-impl IntoIterator for Path {
-    type Item = PathItem;
-    type IntoIter = <Vec<PathItem> as IntoIterator>::IntoIter;
+/// Another name for the empty path, also the default path.
+pub fn root() -> Path {
+    Path::default()
+}
 
-    fn into_iter(self) -> Self::IntoIter {
-        self.items.into_iter()
+impl<T> Div<T> for Path
+where
+    T: Into<PathItem>,
+{
+    type Output = Path;
+
+    fn div(self, item: T) -> Self::Output {
+        self.append(item)
     }
 }
 
@@ -69,5 +92,58 @@ pub enum PathItem {
 impl From<&'static str> for PathItem {
     fn from(value: &'static str) -> Self {
         SmolStr::new_static(value).into()
+    }
+}
+
+impl From<String> for PathItem {
+    fn from(value: String) -> Self {
+        SmolStr::new(value).into()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::{root, PathItem};
+    use alloc::format;
+
+    #[test]
+    fn path_test() {
+        // bulding from various types (note: special smol_str support for &'static str engaged)
+        let version = "V1.6";
+        let path = root() / "CSMS" / 65 / format!("EVSE-{version}") / 2;
+
+        // indexing
+        let evse: u64 = path[3].clone().try_into().unwrap();
+        assert_eq!(evse, 2);
+
+        // other slice operations
+        if let Some(&PathItem::Number(evse)) = path.last() {
+            assert_eq!(evse, 2);
+        }
+
+        // pattern matching
+        match *path {
+            [_, PathItem::Number(csms), ..] => assert_eq!(csms, 65),
+            _ => (),
+        }
+
+        // iterating
+        let cmsms: u64 = path
+            .iter()
+            .skip(1)
+            .next()
+            .unwrap()
+            .clone()
+            .try_into()
+            .unwrap();
+        assert_eq!(cmsms, 65);
+
+        // iterating
+        for item in path {
+            if let PathItem::Number(csms) = item {
+                assert_eq!(csms, 65);
+                break;
+            }
+        }
     }
 }
