@@ -104,6 +104,7 @@ impl From<String> for PathItem {
 mod test {
     use super::{root, Path, PathItem};
     use alloc::format;
+    use smol_str::SmolStr;
 
     #[test]
     fn path_test() {
@@ -114,6 +115,10 @@ mod test {
         // indexing
         let evse: u64 = path[3].clone().try_into().unwrap();
         assert_eq!(evse, 2);
+
+        // indexing again
+        let x: Option<SmolStr> = path[2].clone().try_into().ok();
+        assert_eq!(x.unwrap(), "EVSE-V1.6");
 
         // other slice operations
         if let Some(&PathItem::Number(evse)) = path.last() {
