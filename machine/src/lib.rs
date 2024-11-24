@@ -200,7 +200,6 @@ where
         let mut state: State<M> = Default::default();
         let mut hydra = Hydrator::<M> { state: &mut state };
         self.logger.feed(&mut hydra).await?;
-        drop(hydra);
 
         // Initialise the effector with the rehydrated, state.
         self.effects.init(&state);
