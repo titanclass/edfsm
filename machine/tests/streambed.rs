@@ -22,7 +22,7 @@ async fn phase_1() {
     let _ = std::fs::remove_file(&topic_file);
     let _ = std::fs::create_dir(TEST_DATA);
 
-    let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", Cbor);
+    let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, Cbor);
     let machine = Machine::<Counter>::default().initialise(log).await;
     let prod_task = producer(machine.input());
 
@@ -33,7 +33,7 @@ async fn phase_1() {
 }
 
 async fn phase_2() {
-    let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, "group", Cbor);
+    let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, Cbor);
     let machine = Machine::<Counter>::default().initialise(log).await;
     let sender = machine.input();
     let handle = spawn(machine.task());
