@@ -1,7 +1,7 @@
 pub mod fixtures;
 use edfsm::Input;
 use fixtures::{Command, Counter, Event};
-use machine::{error::Result, Machine};
+use machine::{error::Result, Builder};
 use streambed_logged::FileLog;
 use streambed_machine::{Cbor, CommitLogExt};
 use tokio::{spawn, sync::mpsc::Sender, task::JoinSet};
@@ -23,7 +23,7 @@ async fn phase_1() {
     let _ = std::fs::create_dir(TEST_DATA);
 
     let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, Cbor);
-    let machine = Machine::<Counter>::default().initialise(log).await;
+    let machine = Builder::<Counter>::default().initialise(log).await;
     let prod_task = producer(machine.input());
 
     let mut set = JoinSet::new();
@@ -34,7 +34,7 @@ async fn phase_1() {
 
 async fn phase_2() {
     let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, Cbor);
-    let machine = Machine::<Counter>::default().initialise(log).await;
+    let machine = Builder::<Counter>::default().initialise(log).await;
     let sender = machine.input();
     let handle = spawn(machine.task());
     sender

@@ -1,7 +1,7 @@
 pub mod fixtures;
 use edfsm::Input;
 use fixtures::{Command, Counter, Event, Output};
-use machine::{error::Result, Machine};
+use machine::{error::Result, Builder};
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     task::JoinSet,
@@ -28,7 +28,7 @@ async fn connection_test() {
     let (send_o2, recv_o2) = channel::<Output>(3);
     let log = Vec::<Event>::default();
 
-    let machine = Machine::<Counter>::default()
+    let machine = Builder::<Counter>::default()
         .connect_event_log(log)
         .connect_output(send_o)
         .connect_output(send_o2);

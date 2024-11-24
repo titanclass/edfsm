@@ -8,15 +8,15 @@ pub mod error;
 #[cfg(feature = "std")]
 pub mod output;
 
+#[cfg(feature = "tokio")]
+use tokio::sync::mpsc::{channel, Receiver, Sender};
+
 use crate::{
-    adapter::{Adapter, Discard},
+    adapter::{Adapter, Feed, Placeholder},
     error::Result,
 };
 use core::future::Future;
 use edfsm::{Drain, Fsm, Init, Input};
-
-#[cfg(feature = "tokio")]
-use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 /// The event type of an Fsm
 pub type Event<M> = <M as Fsm>::E;
@@ -31,12 +31,12 @@ pub type In<M> = Input<<M as Fsm>::C, <M as Fsm>::E>;
 pub type Out<M> = <<M as Fsm>::SE as Drain>::Item;
 
 /// The effector/effects type of an Fsm
-pub type Effect<M> = <M as Fsm>::SE;
+pub type Effects<M> = <M as Fsm>::SE;
 
 /// The state type of an Fsm
 pub type State<M> = <M as Fsm>::S;
 
-/// A `Machine` is a state machine (implementing `Fsm`) running in a rust `task`.
+/// A `Machine` is a state machine (implementing `Fsm`) that runs in a rust `task`.
 ///
 /// Each `Machine` has a current state, an input channel, an effector and adapters.
 /// The type of the state and the channel are part of the state machine specification.
@@ -50,26 +50,192 @@ pub type State<M> = <M as Fsm>::S;
 /// The adapters are for communication and event logging.
 /// A machine's inputs and outputs can be wired up without affecting the underlying state machine.  
 /// Communication is always asynchronous and the adapter `notify` method is `async`.  
-pub struct Machine<M, N = Discard<Event<M>>, O = Discard<Out<M>>>
+pub trait Machine
+where
+    Self::M: Fsm,
+    Effects<Self::M>: Drain,
+{
+    type M;
+
+    fn input(&self) -> Sender<In<Self::M>>;
+    fn with_output(
+        self,
+        output: impl Adapter<Item = Out<Self::M>> + 'static,
+    ) -> impl Machine<M = Self::M>;
+    fn with_event_log(
+        self,
+        log: impl Adapter<Item = Event<Self::M>> + Feed<Item = Event<Self::M>> + 'static,
+    ) -> impl Machine<M = Self::M>;
+    fn merge_output(
+        self,
+        output: impl Adapter<Item = Out<Self::M>> + 'static,
+    ) -> impl Machine<M = Self::M>
+    where
+        Out<Self::M>: Clone + Send;
+    fn task(self) -> impl Future<Output = Result<()>> + Send + 'static
+    where
+        Self: Sized,
+        Out<Self::M>: Send,
+        Event<Self::M>: Send,
+        Effects<Self::M>: Init<State<Self::M>> + Send,
+        Command<Self::M>: Send,
+        State<Self::M>: Default + Send;
+}
+
+pub struct Template<M, N, O>
 where
     M: Fsm,
-    Effect<M>: Drain,
 {
-    state: State<M>,
     sender: Option<Sender<In<M>>>,
     receiver: Receiver<In<M>>,
-    effector: Effect<M>,
+    effects: Effects<M>,
     logger: N,
     output: O,
+}
+
+impl<M, N, O> Machine for Template<M, N, O>
+where
+    M: Fsm + 'static,
+    Effects<M>: Drain,
+    N: Adapter<Item = Event<M>> + Feed<Item = Event<M>> + 'static,
+    O: Adapter<Item = Out<M>> + 'static,
+{
+    type M = M;
+
+    fn input(&self) -> Sender<In<Self::M>> {
+        self.sender.as_ref().unwrap().clone()
+    }
+
+    fn with_output(
+        self,
+        output: impl Adapter<Item = Out<Self::M>> + 'static,
+    ) -> impl Machine<M = Self::M> {
+        Template {
+            sender: self.sender,
+            receiver: self.receiver,
+            effects: self.effects,
+            logger: self.logger,
+            output,
+        }
+    }
+
+    fn merge_output(
+        self,
+        output: impl Adapter<Item = Out<Self::M>> + 'static,
+    ) -> impl Machine<M = Self::M>
+    where
+        Out<Self::M>: Clone + Send,
+    {
+        Template {
+            sender: self.sender,
+            receiver: self.receiver,
+            effects: self.effects,
+            logger: self.logger,
+            output: self.output.merge(output),
+        }
+    }
+
+    fn with_event_log(
+        self,
+        log: impl Adapter<Item = Event<Self::M>> + Feed<Item = Event<Self::M>> + 'static,
+    ) -> impl Machine<M = Self::M> {
+        Template {
+            sender: self.sender,
+            receiver: self.receiver,
+            effects: self.effects,
+            logger: log,
+            output: self.output,
+        }
+    }
+
+    async fn task(mut self) -> Result<()>
+    where
+        Effects<Self::M>: Init<State<Self::M>>,
+        State<Self::M>: Default,
+        Event<M>: Send,
+        State<M>: Send,
+    {
+        // close the local sender side of the input channel
+        // this ensures the task will exit when all other senders are closed
+        self.sender = None;
+
+        // Construct the initial state and rehydrate it from the log.
+        let mut state: State<M> = Default::default();
+        let mut hydra = Hydrator::<M> { state: &mut state };
+        self.logger.feed(&mut hydra).await?;
+        drop(hydra);
+
+        // Initialise the effector with the rehydrated, state.
+        self.effects.init(&state);
+
+        // Flush output messages generated in initialisation
+        for item in self.effects.drain_all() {
+            self.output.notify(item).await?
+        }
+
+        // Read events and commands
+        while let Some(input) = self.receiver.recv().await {
+            // Run Fsm and log any event
+            if let Some(e) = M::step(&mut state, input, &mut self.effects) {
+                self.logger.notify(e).await?;
+            }
+
+            // Flush output messages generated during the `step`, if any.
+            for item in self.effects.drain_all() {
+                self.output.notify(item).await?
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Default machine input backlog limit
 pub const DEFAULT_BUFFER: usize = 10;
 
-impl<M> Default for Machine<M>
+pub fn machine<M>() -> impl Machine<M = M>
+where
+    M: Fsm + 'static,
+    Effects<M>: Drain + Default,
+    Out<M>: Send + Clone,
+    Event<M>: Send + Sync,
+{
+    machine_with_effects(Default::default(), DEFAULT_BUFFER)
+}
+
+pub fn machine_with_effects<M>(effects: Effects<M>, buffer: usize) -> impl Machine<M = M>
+where
+    M: Fsm + 'static,
+    Effects<M>: Drain,
+    Out<M>: Send + Clone,
+    Event<M>: Send + Sync,
+{
+    let (sender, receiver) = channel(buffer);
+    Template {
+        sender: Some(sender),
+        receiver,
+        effects,
+        logger: Placeholder::default(),
+        output: Placeholder::default(),
+    }
+}
+
+pub struct Builder<M, N = Placeholder<Event<M>>, O = Placeholder<Out<M>>>
 where
     M: Fsm,
-    Effect<M>: Drain + Default,
+    Effects<M>: Drain,
+{
+    state: State<M>,
+    sender: Option<Sender<In<M>>>,
+    receiver: Receiver<In<M>>,
+    effector: Effects<M>,
+    logger: N,
+    output: O,
+}
+
+impl<M> Default for Builder<M>
+where
+    M: Fsm,
+    Effects<M>: Drain + Default,
     State<M>: Default,
 {
     fn default() -> Self {
@@ -77,17 +243,17 @@ where
     }
 }
 
-impl<M> Machine<M>
+impl<M> Builder<M>
 where
     M: Fsm,
-    Effect<M>: Drain,
+    Effects<M>: Drain,
     State<M>: Default,
 {
     /// Construct a machine from an explicit, possibly non-default, effector,
     /// and an explicit input buffer size.
-    pub fn new(effector: Effect<M>, buffer: usize) -> Self {
+    pub fn new(effector: Effects<M>, buffer: usize) -> Self {
         let (sender, receiver) = channel(buffer);
-        Machine {
+        Builder {
             state: Default::default(),
             sender: Some(sender),
             receiver,
@@ -98,10 +264,10 @@ where
     }
 }
 
-impl<M, N, O> Machine<M, N, O>
+impl<M, N, O> Builder<M, N, O>
 where
     M: Fsm,
-    Effect<M>: Drain,
+    Effects<M>: Drain,
 {
     /// Return an adapter for initialisation events.  
     ///
@@ -133,13 +299,13 @@ where
     ///
     /// Any number of channels or adapters can be connected, enabling fan-out of messages.
     /// Each will receive all events, however if an adapter stalls this will stall the state machine.
-    pub fn connect_event_log<T>(self, logger: T) -> Machine<M, impl Adapter<Item = Event<M>>, O>
+    pub fn connect_event_log<T>(self, logger: T) -> Builder<M, impl Adapter<Item = Event<M>>, O>
     where
         T: Adapter<Item = Event<M>>,
         N: Adapter<Item = Event<M>>,
         Event<M>: Send + Clone,
     {
-        Machine {
+        Builder {
             state: self.state,
             sender: self.sender,
             receiver: self.receiver,
@@ -153,13 +319,13 @@ where
     ///
     /// Any number of channels or adapters can be connected, enabling fan-out of messages.
     /// Each will receive all output messages, however if an adapter stalls this will stall the state machine.
-    pub fn connect_output<T>(self, output: T) -> Machine<M, N, impl Adapter<Item = Out<M>>>
+    pub fn connect_output<T>(self, output: T) -> Builder<M, N, impl Adapter<Item = Out<M>>>
     where
         T: Adapter<Item = Out<M>>,
         O: Adapter<Item = Out<M>>,
         Out<M>: Send + Clone,
     {
-        Machine {
+        Builder {
             state: self.state,
             sender: self.sender,
             receiver: self.receiver,
@@ -171,13 +337,13 @@ where
 
     /// Convert this machine into a future that will run as a task
     #[allow(clippy::manual_async_fn)]
-    pub fn task(mut self) -> impl Future<Output = Result<()>> + Send
+    pub fn task(mut self) -> impl Future<Output = Result<()>>
     where
         N: Adapter<Item = Event<M>>,
         O: Adapter<Item = Out<M>>,
         Event<M>: Clone + Send + 'static,
         Out<M>: Clone + Send + 'static,
-        Effect<M>: Init<State<M>> + Send,
+        Effects<M>: Init<State<M>> + Send,
         State<M>: Send,
         Command<M>: Send,
     {
@@ -242,15 +408,15 @@ where
 
 #[cfg(feature = "streambed")]
 mod commit_log {
-    use crate::{Adapter, Drain, Effect, Event, Machine};
+    use crate::{Adapter, Builder, Drain, Effects, Event};
     use edfsm::Fsm;
     use futures_util::StreamExt;
     use streambed_machine::{Codec, CommitLog, LogAdapter};
 
-    impl<M, N, O> Machine<M, N, O>
+    impl<M, N, O> Builder<M, N, O>
     where
         M: Fsm,
-        Effect<M>: Drain,
+        Effects<M>: Drain,
         N: Adapter<Item = Event<M>>,
         Event<M>: Send + Sync + Clone + 'static,
     {
@@ -258,7 +424,7 @@ mod commit_log {
         pub async fn initialise<L, C>(
             mut self,
             log: LogAdapter<L, C, Event<M>>,
-        ) -> Machine<M, impl Adapter<Item = Event<M>>, O>
+        ) -> Builder<M, impl Adapter<Item = Event<M>>, O>
         where
             L: CommitLog + Send + Sync,
             C: Codec<Event<M>> + Send + Sync,

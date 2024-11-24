@@ -1,6 +1,5 @@
 use crate::error::Result;
 use core::{future::Future, marker::PhantomData};
-use futures_util::{Stream, StreamExt};
 
 /// A trait to intercept messages in a `Machine` for logging and outbound communication.
 ///
@@ -15,22 +14,6 @@ pub trait Adapter: Send {
     fn notify(&mut self, a: Self::Item) -> impl Future<Output = Result<()>> + Send
     where
         Self::Item: 'static;
-
-    /// Consume the given asyn `Stream`, passing each item to this adapter.
-    /// This adapter is then dropped.
-    fn notify_all<S>(mut self, mut stream: S) -> impl Future<Output = Result<()>> + Send
-    where
-        Self: Send + Sized,
-        S: Stream<Item = Self::Item> + Unpin + Send,
-        Self::Item: Send + 'static,
-    {
-        async move {
-            while let Some(a) = stream.next().await {
-                self.notify(a).await?;
-            }
-            Ok(())
-        }
-    }
 
     /// Combine this with another adapter. The notify call is delegated to both adapters.
     fn merge<T>(self, other: T) -> impl Adapter<Item = Self::Item>
@@ -96,17 +79,19 @@ pub trait Adapter: Send {
     }
 }
 
-/// A  placeholder `Adapter` that discards all items and never notifies.
+/// A  placeholder for an `Adapter` and/or `Feed`.
+///
+/// As an `Adapter` this discards all items. As a `Feed` it provides no items.
 #[derive(Debug)]
-pub struct Discard<Event>(PhantomData<Event>);
+pub struct Placeholder<Event>(PhantomData<Event>);
 
-impl<A> Default for Discard<A> {
+impl<A> Default for Placeholder<A> {
     fn default() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<A> Adapter for Discard<A>
+impl<A> Adapter for Placeholder<A>
 where
     A: Send,
 {
@@ -227,11 +212,55 @@ pub mod adapt_tokio {
     }
 }
 
+/// A source of messages that can `feed` an `Adapter`.
+pub trait Feed {
+    type Item;
+
+    /// Send a stream of messages into an adapter.
+    fn feed(
+        &self,
+        output: &mut impl Adapter<Item = Self::Item>,
+    ) -> impl Future<Output = Result<()>> + Send;
+}
+
+impl<A> Feed for Placeholder<A>
+where
+    A: Send,
+    Self: Sync,
+{
+    type Item = A;
+
+    async fn feed(&self, _: &mut impl Adapter<Item = Self::Item>) -> Result<()> {
+        Ok(())
+    }
+}
+
 /// Implementations of `Adapter` for streambed
 #[cfg(feature = "streambed")]
 mod adapt_streambed {
-    use crate::adapter::Adapter;
+    use crate::{
+        adapter::{Adapter, Feed},
+        error::Result,
+    };
+    use futures_util::StreamExt;
     use streambed_machine::{Codec, CommitLog, LogAdapter};
+
+    impl<L, C, A> Feed for LogAdapter<L, C, A>
+    where
+        C: Codec<A> + Sync + Send,
+        L: CommitLog + Sync + Send,
+        A: Send + Sync + Clone + 'static,
+    {
+        type Item = A;
+
+        async fn feed(&self, output: &mut impl Adapter<Item = Self::Item>) -> Result<()> {
+            let mut s = self.history().await;
+            while let Some(a) = s.next().await {
+                output.notify(a).await?;
+            }
+            Ok(())
+        }
+    }
 
     impl<L, C, A> Adapter for LogAdapter<L, C, A>
     where
@@ -241,7 +270,7 @@ mod adapt_streambed {
     {
         type Item = A;
 
-        async fn notify(&mut self, a: Self::Item) -> crate::error::Result<()>
+        async fn notify(&mut self, a: Self::Item) -> Result<()>
         where
             Self::Item: 'static,
         {
