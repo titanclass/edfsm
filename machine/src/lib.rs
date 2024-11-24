@@ -36,20 +36,34 @@ pub type Effects<M> = <M as Fsm>::SE;
 /// The state type of an Fsm
 pub type State<M> = <M as Fsm>::S;
 
-/// A `Machine` is a state machine (implementing `Fsm`) that runs in a rust `task`.
+/// A `Machine` is a state machine (implementing `Fsm`) that will run in a rust `task`.
 ///
-/// Each `Machine` has a current state, an input channel, an effector and adapters.
-/// The type of the state and the channel are part of the state machine specification.
-/// As messages arrive on the channel, the state machine `Fsm::step` method
-/// evolves the state and orchestrates side effects.
+/// Each `Machine` has an input channel, and adapters for output and event log.
+/// The type of the input messages, events and output messages are part of
+/// the state machine specification, ie the `Fsm` implementation.
+/// Conversely, the wiring or inputs and outputs is independent of the underlying state machine
+/// and involves channels and adapters.
 ///
-/// The effector enables the machine to execute side effects and its type is also part of
-/// the state machine specification, `Fsm::SE`.  Generally, side effects must
-/// be synchronous and if they may block they should be bracketed with tokio's `block_in_place`.
+/// A `Machine` also has a data structure used to perform side effects, including generating output messages.
+/// The type of this is also part of the state machine specification (the `SE` associated type).  
+/// Note: side effects must be synchronous. If they may block they should be bracketed with
+/// tokio's `block_in_place` or equivalent.
 ///
-/// The adapters are for communication and event logging.
-/// A machine's inputs and outputs can be wired up without affecting the underlying state machine.  
-/// Communication is always asynchronous and the adapter `notify` method is `async`.  
+/// A machine is created by functions `machine` or `machine_with_effects`.
+/// It is wired to other machines or channels by functions `input`, `with_output`, `merge_output` and
+/// `with_event_log`.
+///
+/// The machine is made runnable by function `task`.  This is a future intended to be spawned onto
+/// the tokio (or other) runtime.
+///
+/// Once running, a `Machine`
+/// - initialises state, which may involve replaying messages from the event log
+/// - performs initial effects
+/// - enters the main loop, which is dirven by messages received on the input channel
+/// - each message may cause the state to evolve and/or generate side effects
+/// - an event is logged if the state changed
+/// - any output messages are dispatched
+///
 pub trait Machine
 where
     Self::M: Fsm,
@@ -57,21 +71,43 @@ where
 {
     type M;
 
+    /// Return a new `Sender` for the input channel.
+    /// Any number can be created , enabling fan-in of messages.
+    ///
+    /// The sender accepts the Fsm `Input` values, representing either
+    /// a command or an event.   It implements `Adapter` so the type can be adjusted.
+    /// For example, to accept events only use:
+    ///
+    /// `machine.input().adapt_map(Input::Event)`
+    ///
     fn input(&self) -> Sender<In<Self::M>>;
+
+    /// Connect a channel `Sender` or an adapter for output messages.
+    ///
+    /// Note that if the channel or adapter stalls this will stall the state machine.
     fn with_output(
         self,
         output: impl Adapter<Item = Out<Self::M>> + 'static,
     ) -> impl Machine<M = Self::M>;
+
+    /// Connect an event log that provides intialisation and records events.
     fn with_event_log(
         self,
         log: impl Adapter<Item = Event<Self::M>> + Feed<Item = Event<Self::M>> + 'static,
     ) -> impl Machine<M = Self::M>;
+
+    /// Connect an additional channel or adapter for output messages.
+    ///
+    /// Any number of channels or adapters can be connected, enabling fan-out of messages.
+    /// Each will receive all output messages, however if an adapter stalls this will stall the state machine.
     fn merge_output(
         self,
         output: impl Adapter<Item = Out<Self::M>> + 'static,
     ) -> impl Machine<M = Self::M>
     where
         Out<Self::M>: Clone + Send;
+
+    /// Convert this machine into a future that will run as a task
     fn task(self) -> impl Future<Output = Result<()>> + Send + 'static
     where
         Self: Sized,
@@ -82,6 +118,7 @@ where
         State<Self::M>: Default + Send;
 }
 
+/// A concrete `Machine`
 pub struct Template<M, N, O>
 where
     M: Fsm,
@@ -219,170 +256,12 @@ where
     }
 }
 
-pub struct Builder<M, N = Placeholder<Event<M>>, O = Placeholder<Out<M>>>
-where
-    M: Fsm,
-    Effects<M>: Drain,
-{
-    state: State<M>,
-    sender: Option<Sender<In<M>>>,
-    receiver: Receiver<In<M>>,
-    effector: Effects<M>,
-    logger: N,
-    output: O,
-}
-
-impl<M> Default for Builder<M>
-where
-    M: Fsm,
-    Effects<M>: Drain + Default,
-    State<M>: Default,
-{
-    fn default() -> Self {
-        Self::new(Default::default(), DEFAULT_BUFFER)
-    }
-}
-
-impl<M> Builder<M>
-where
-    M: Fsm,
-    Effects<M>: Drain,
-    State<M>: Default,
-{
-    /// Construct a machine from an explicit, possibly non-default, effector,
-    /// and an explicit input buffer size.
-    pub fn new(effector: Effects<M>, buffer: usize) -> Self {
-        let (sender, receiver) = channel(buffer);
-        Builder {
-            state: Default::default(),
-            sender: Some(sender),
-            receiver,
-            effector,
-            logger: Default::default(),
-            output: Default::default(),
-        }
-    }
-}
-
-impl<M, N, O> Builder<M, N, O>
-where
-    M: Fsm,
-    Effects<M>: Drain,
-{
-    /// Return an adapter for initialisation events.  
-    ///
-    /// Events received will be applied to the state without causing side effects,
-    /// reconstructing or rehydrating the state. Then the adapter should be dropped.
-    ///
-    /// This is an optional step before the machine is converted to a task.
-    /// Remain effector-specific initialisation occurs in the task.
-    pub fn initial_events(&mut self) -> Hydrator<M> {
-        Hydrator {
-            state: &mut self.state,
-        }
-    }
-
-    /// Return a new `Sender` for the input channel.
-    /// Any number can be created , enabling fan-in of messages.
-    ///
-    /// The sender accepts the Fsm `Input` values, representing either
-    /// a command or an event.   It implements `Adapter` so the type can be adjusted.
-    /// For example, to accept events only use:
-    ///
-    /// `machine.input().adapt_map(Input::Event)`
-    ///
-    pub fn input(&self) -> Sender<In<M>> {
-        self.sender.as_ref().unwrap().clone()
-    }
-
-    /// Connect a channel sender or adapter for logging events.  
-    ///
-    /// Any number of channels or adapters can be connected, enabling fan-out of messages.
-    /// Each will receive all events, however if an adapter stalls this will stall the state machine.
-    pub fn connect_event_log<T>(self, logger: T) -> Builder<M, impl Adapter<Item = Event<M>>, O>
-    where
-        T: Adapter<Item = Event<M>>,
-        N: Adapter<Item = Event<M>>,
-        Event<M>: Send + Clone,
-    {
-        Builder {
-            state: self.state,
-            sender: self.sender,
-            receiver: self.receiver,
-            effector: self.effector,
-            logger: self.logger.merge(logger),
-            output: self.output,
-        }
-    }
-
-    /// Connect a channel sender or adapter for output messages.
-    ///
-    /// Any number of channels or adapters can be connected, enabling fan-out of messages.
-    /// Each will receive all output messages, however if an adapter stalls this will stall the state machine.
-    pub fn connect_output<T>(self, output: T) -> Builder<M, N, impl Adapter<Item = Out<M>>>
-    where
-        T: Adapter<Item = Out<M>>,
-        O: Adapter<Item = Out<M>>,
-        Out<M>: Send + Clone,
-    {
-        Builder {
-            state: self.state,
-            sender: self.sender,
-            receiver: self.receiver,
-            effector: self.effector,
-            logger: self.logger,
-            output: self.output.merge(output),
-        }
-    }
-
-    /// Convert this machine into a future that will run as a task
-    #[allow(clippy::manual_async_fn)]
-    pub fn task(mut self) -> impl Future<Output = Result<()>>
-    where
-        N: Adapter<Item = Event<M>>,
-        O: Adapter<Item = Out<M>>,
-        Event<M>: Clone + Send + 'static,
-        Out<M>: Clone + Send + 'static,
-        Effects<M>: Init<State<M>> + Send,
-        State<M>: Send,
-        Command<M>: Send,
-    {
-        async move {
-            // close the local sender side of the input channel
-            // this ensures the task will exit when all other senders are closed
-            self.sender = None;
-
-            // Initialise the effector with the, possibly rehydrated, state.
-            self.effector.init(&self.state);
-
-            // Flush output messages generated in initialisation
-            for item in self.effector.drain_all() {
-                self.output.notify(item).await?
-            }
-
-            // Read events and commands
-            while let Some(input) = self.receiver.recv().await {
-                // Run Fsm and log any event
-                if let Some(e) = M::step(&mut self.state, input, &mut self.effector) {
-                    self.logger.notify(e).await?;
-                }
-
-                // Flush output messages generated during the `step`, if any.
-                for item in self.effector.drain_all() {
-                    self.output.notify(item).await?
-                }
-            }
-            Ok(())
-        }
-    }
-}
-
 /// A `Hydrator` is an event `Adapter` that accepts
 /// a stream of initialisation events for an `Fsm`.
 ///
 /// It will apply these to the state bringing it up
 /// to date without causing side effects.
-pub struct Hydrator<'a, M>
+struct Hydrator<'a, M>
 where
     M: Fsm,
 {
@@ -403,38 +282,5 @@ where
     {
         M::on_event(self.state, &a);
         Ok(())
-    }
-}
-
-#[cfg(feature = "streambed")]
-mod commit_log {
-    use crate::{Adapter, Builder, Drain, Effects, Event};
-    use edfsm::Fsm;
-    use futures_util::StreamExt;
-    use streambed_machine::{Codec, CommitLog, LogAdapter};
-
-    impl<M, N, O> Builder<M, N, O>
-    where
-        M: Fsm,
-        Effects<M>: Drain,
-        N: Adapter<Item = Event<M>>,
-        Event<M>: Send + Sync + Clone + 'static,
-    {
-        /// Connect this Fsm to a streambed `CommitLog` and initialise its state.
-        pub async fn initialise<L, C>(
-            mut self,
-            log: LogAdapter<L, C, Event<M>>,
-        ) -> Builder<M, impl Adapter<Item = Event<M>>, O>
-        where
-            L: CommitLog + Send + Sync,
-            C: Codec<Event<M>> + Send + Sync,
-        {
-            let mut events = log.history().await;
-            while let Some(e) = events.next().await {
-                M::on_event(&mut self.state, &e);
-            }
-            drop(events);
-            self.connect_event_log(log)
-        }
     }
 }

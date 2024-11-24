@@ -2,7 +2,7 @@ pub mod fixtures;
 use edfsm::Input;
 use fixtures::{Counter, Event, Output, State};
 use kv_store::{requester, Keyed, KvStore, Path, Query};
-use machine::{error::Result, Builder};
+use machine::{error::Result, machine, Machine};
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     task::JoinSet,
@@ -51,7 +51,7 @@ async fn asker(sender: Sender<Input<Query<State, Event>, Keyed<Event>>>) -> Resu
 async fn basic_kv_test() {
     let (send_o, recv_o) = channel::<Keyed<Output>>(3);
 
-    let machine = Builder::<KvStore<Counter>>::default().connect_output(send_o);
+    let machine = machine::<KvStore<Counter>>().with_output(send_o);
     let prod_task = producer(machine.input(), 99);
     let cons_task = consumer(recv_o, 9);
     let ask_task = asker(machine.input());
@@ -68,7 +68,7 @@ async fn basic_kv_test() {
 async fn empty_kv_test() {
     let (send_o, recv_o) = channel::<Keyed<Output>>(3);
 
-    let machine = Builder::<KvStore<Counter>>::default().connect_output(send_o);
+    let machine = machine::<KvStore<Counter>>().with_output(send_o);
     let cons_task = consumer(recv_o, 0);
     let ask_task = asker(machine.input());
 

@@ -181,6 +181,22 @@ where
     }
 }
 
+/// Implement `Feed` for a vector
+#[cfg(feature = "std")]
+impl<A> Feed for std::vec::Vec<A>
+where
+    A: Clone + Send + Sync + 'static,
+{
+    type Item = A;
+
+    async fn feed(&self, output: &mut impl Adapter<Item = Self::Item>) -> Result<()> {
+        for a in self.iter().cloned() {
+            output.notify(a).await?;
+        }
+        Ok(())
+    }
+}
+
 /// Implementations of  `Adapter` for tokio channels.
 #[cfg(feature = "tokio")]
 pub mod adapt_tokio {
