@@ -228,6 +228,7 @@ where
 /// Default machine input backlog limit
 pub const DEFAULT_BUFFER: usize = 10;
 
+/// Create new machine for an `Fsm` of type `M`
 pub fn machine<M>() -> impl Machine<M = M>
 where
     M: Fsm + 'static,
@@ -238,6 +239,7 @@ where
     machine_with_effects(Default::default(), DEFAULT_BUFFER)
 }
 
+/// Create a new machine for an `Fsm` of type `M` with explicit effects and backlog
 pub fn machine_with_effects<M>(effects: Effects<M>, buffer: usize) -> impl Machine<M = M>
 where
     M: Fsm + 'static,
