@@ -119,7 +119,7 @@ where
 }
 
 /// A concrete `Machine`
-pub struct Template<M, N, O>
+struct Template<M, N, O>
 where
     M: Fsm,
 {
