@@ -178,10 +178,10 @@ mod test {
     use crate::{Cbor, CborEncrypted, CommitLogExt};
     use futures_util::StreamExt;
     use serde::{Deserialize, Serialize};
-    use std::path::Path;
+    use std::{path::Path, time::Duration};
     use streambed_confidant::FileSecretStore;
     use streambed_logged::FileLog;
-    use tokio::task::yield_now;
+    use tokio::{task::yield_now, time::sleep};
 
     // use std::time::Duration;
     // use tokio::time::sleep;
@@ -205,7 +205,7 @@ mod test {
     #[tokio::test]
     async fn cbor_history() {
         cbor_produce().await;
-        // sleep(Duration::from_secs(1)).await;
+        sleep(Duration::from_secs(1)).await;
         let mut data = fixture_data();
         let log = FileLog::new(TEST_DATA).adapt::<Event>(TOPIC, Cbor);
         let mut history = log.history().await;
