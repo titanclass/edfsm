@@ -22,23 +22,24 @@ async fn consumer(mut receiver: Receiver<Output>) -> Result<()> {
     Ok(())
 }
 
+fn build() -> impl Machine<M = Counter> {
+    let log = Vec::<Event>::default();
+    machine::<Counter>().with_event_log(log)
+}
+
 #[tokio::test]
 async fn connection_test() {
     let (send_o, recv_o) = channel::<Output>(3);
     let (send_o2, recv_o2) = channel::<Output>(3);
-    let log = Vec::<Event>::default();
 
-    let machine = machine::<Counter>()
-        .with_event_log(log)
-        .with_output(send_o)
-        .merge_output(send_o2);
+    let builder = build().with_output(send_o).merge_output(send_o2);
 
-    let prod_task = producer(machine.input());
+    let prod_task = producer(builder.input());
     let cons_task = consumer(recv_o);
     let cons_task2 = consumer(recv_o2);
 
     let mut set = JoinSet::new();
-    set.spawn(machine.task());
+    set.spawn(builder.task());
     set.spawn(cons_task);
     set.spawn(cons_task2);
     set.spawn(prod_task);
