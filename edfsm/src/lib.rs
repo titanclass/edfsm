@@ -1,7 +1,7 @@
 #![doc = include_str!("../README.md")]
 #![no_std]
 
-pub use event_driven_macros::impl_fsm;
+pub use edfsm_macros::impl_fsm;
 
 /// A type of input - commands or events.
 #[derive(Debug, Clone)]

@@ -1,0 +1,30 @@
+[package]
+name = "edfsm-machine"
+description = "Tasks and Channels for Event Driven Finite State Machines"
+readme = "README.md"
+
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = ["from"] }
+embassy-sync = { workspace = true, optional = true }
+futures-util = { workspace = true }
+tokio = { workspace = true, features = ["sync"], optional = true }
+
+edfsm.workspace = true
+
+[dev-dependencies]
+derive_more = { workspace = true, features = ["try_into"] }
+serde = { workspace = true }
+streambed-logged = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
+[features]
+#default = ["tokio", "streambed"]
+default = ["tokio"]
+embassy = ["dep:embassy-sync"]
+std = []
+tokio = ["dep:tokio", "std"]

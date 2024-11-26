@@ -1,0 +1,37 @@
+[package]
+name = "edfsm-kv-store"
+description = "A KV Store based on Event Driven Finite State Machines"
+readme = "README.md"
+
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+derive_more = { workspace = true, features = [
+    "from",
+    "try_into",
+    "deref",
+    "into_iterator",
+] }
+embassy-sync = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
+smol_str = { workspace = true, features = ["serde"] }
+tokio = { workspace = true, features = ["sync"], optional = true }
+
+edfsm = { workspace = true }
+edfsm-machine = { workspace = true, optional = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
+serde_qs = { workspace = true }
+tokio = { workspace = true, features = ["full"] }
+
+edfsm-machine = { workspace = true }
+
+[features]
+default = ["tokio"]
+tokio = ["dep:tokio", "dep:edfsm-machine", "std"]
+embassy = ["dep:embassy-sync"]
+std = ["smol_str/std"]

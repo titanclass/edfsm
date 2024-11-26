@@ -1,3 +1,3 @@
-# KV Store
+# Event Driven FSM KV Store
 
 A KV Store based on edfsm FSM.

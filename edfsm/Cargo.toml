@@ -9,4 +9,4 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
-event-driven-macros.workspace = true
+edfsm-macros.workspace = true

@@ -136,8 +136,8 @@ mod test {
         }
 
         // iterating
-        let cmsms: u64 = path.iter().nth(1).unwrap().clone().try_into().unwrap();
-        assert_eq!(cmsms, 65);
+        let csms: u64 = path.iter().nth(1).unwrap().clone().try_into().unwrap();
+        assert_eq!(csms, 65);
 
         // iterating
         for item in path {

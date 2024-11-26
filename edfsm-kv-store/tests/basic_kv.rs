@@ -1,8 +1,8 @@
 pub mod fixtures;
 use edfsm::Input;
+use edfsm_kv_store::{requester, Keyed, KvStore, Path, Query};
+use edfsm_machine::{error::Result, machine, Machine};
 use fixtures::{Counter, Event, Output, State};
-use kv_store::{requester, Keyed, KvStore, Path, Query};
-use machine::{error::Result, machine, Machine};
 use tokio::{
     sync::mpsc::{channel, Receiver, Sender},
     task::JoinSet,
