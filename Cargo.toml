@@ -3,11 +3,10 @@
 resolver = "2"
 
 members = [
-    "event-driven",
-    "event-driven-macros",
-    "kv_store",
-    "machine",
-    "streambed-machine",
+    "edfsm",
+    "edfsm-macros",
+    "edfsm-kv-store",
+    "edfsm-machine",
 ]
 
 [workspace.package]
@@ -19,8 +18,22 @@ license = "Apache-2.0"
 repository = "https://github.com/titanclass/edfsm.git"
 
 [workspace.dependencies]
-edfsm = { path = "event-driven", version = "0.7.0" }
-event-driven-macros = { path = "event-driven-macros", version = "0.7.0" }
-streambed-machine = { path = "streambed-machine", version = "0.1.0" }
-machine = { path = "machine", version = "0.7.0" }
-kv_store = { path = "kv_store", version = "0.7.0" }
+derive_more = "1"
+embassy-sync = "0.6.0"
+futures-util = "0.3"
+proc-macro2 = "1"
+proc-macro-error = "1"
+quote = "1"
+serde = "1"
+serde_json = "1"
+serde_qs = "0.13"
+smol_str = "0.3.2"
+streambed-codec = { git = "https://github.com/arnolddevos/streambed-rs.git", rev = "a203805eb2ce57a06a562806d4b2ab952808fd46" }
+streambed-logged = { git = "https://github.com/arnolddevos/streambed-rs.git", rev = "a203805eb2ce57a06a562806d4b2ab952808fd46" }
+syn = "1"
+tokio = "1"
+
+edfsm = { path = "edfsm", version = "0.7.0" }
+edfsm-macros = { path = "edfsm-macros", version = "0.7.0" }
+edfsm-kv-store = { path = "edfsm-kv-store", version = "0.7.0" }
+edfsm-machine = { path = "edfsm-machine", version = "0.7.0" }

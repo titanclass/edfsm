@@ -1,9 +1,9 @@
 pub mod fixtures;
 use edfsm::Input;
+use edfsm_machine::{error::Result, machine, Machine};
 use fixtures::{Command, Counter, Event};
-use machine::{error::Result, machine, Machine};
+use streambed_codec::{Cbor, CommitLogExt};
 use streambed_logged::FileLog;
-use streambed_machine::{Cbor, CommitLogExt};
 use tokio::{spawn, sync::mpsc::Sender, task::JoinSet};
 
 const TEST_DATA: &str = "test_data";

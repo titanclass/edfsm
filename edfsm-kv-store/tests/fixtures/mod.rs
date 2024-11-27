@@ -1,5 +1,5 @@
 use edfsm::{Change, Fsm, Terminating};
-use machine::output::OutputBuffer;
+use edfsm_machine::output::OutputBuffer;
 use serde::{Deserialize, Serialize};
 
 pub struct Counter;

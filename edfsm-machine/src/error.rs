@@ -1,7 +1,7 @@
 use derive_more::From;
 
 /// Result type for this module
-pub type Result<A> = std::result::Result<A, Error>;
+pub type Result<A> = core::result::Result<A, Error>;
 
 /// Error type for this module
 #[derive(Debug, Clone, From)]
@@ -37,8 +37,8 @@ pub mod adapt_tokio {
 mod adapt_streambed {
     use super::Error;
 
-    impl From<streambed_machine::ProducerError> for Error {
-        fn from(_: streambed_machine::ProducerError) -> Self {
+    impl From<streambed_codec::ProducerError> for Error {
+        fn from(_: streambed_codec::ProducerError) -> Self {
             Error::ChannelClosed
         }
     }

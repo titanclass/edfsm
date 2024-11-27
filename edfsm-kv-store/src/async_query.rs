@@ -2,7 +2,7 @@ use crate::{Keyed, Path, Query, RespondMany, RespondOne};
 use alloc::boxed::Box;
 use core::ops::Bound;
 use edfsm::Input;
-use machine::{adapter::Adapter, error::Result};
+use edfsm_machine::{adapter::Adapter, error::Result};
 use tokio::sync::oneshot;
 
 /// Create a handle for async queries on the given channel or adapter

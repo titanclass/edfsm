@@ -259,7 +259,7 @@ mod adapt_streambed {
         error::Result,
     };
     use futures_util::StreamExt;
-    use streambed_machine::{Codec, CommitLog, LogAdapter};
+    use streambed_codec::{Codec, CommitLog, LogAdapter};
 
     impl<L, C, A> Feed for LogAdapter<L, C, A>
     where
