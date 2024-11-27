@@ -226,8 +226,8 @@ where
         while let Some(input) = self.receiver.recv().await {
             // Run Fsm and log any event
             if let Some(e) = M::step(&mut state, input, &mut self.effects) {
-                self.events.notify(e.clone()).await?;
-                self.log.notify(e).await?;
+                self.log.clone_notify(&e).await?;
+                self.events.notify(e).await?;
             }
 
             // Flush output messages generated during the `step`, if any.

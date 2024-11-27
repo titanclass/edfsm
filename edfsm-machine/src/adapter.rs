@@ -15,6 +15,15 @@ pub trait Adapter: Send {
     where
         Self::Item: 'static;
 
+    /// Clone the referenced item and then forward it to an asynchonous consumer.
+    /// The clone operation can is avoid in the `Placeholder` implementation.
+    fn clone_notify(&mut self, a: &Self::Item) -> impl Future<Output = Result<()>> + Send
+    where
+        Self::Item: Clone + 'static,
+    {
+        self.notify(a.clone())
+    }
+
     /// Combine this with another adapter. The notify call is delegated to both adapters.
     fn merge<T>(self, other: T) -> impl Adapter<Item = Self::Item>
     where
@@ -100,6 +109,11 @@ where
     /// Discard the item
     async fn notify(&mut self, _e: Self::Item) -> Result<()> {
         Ok(())
+    }
+
+    /// Ignore the reference and avoid the clone.
+    fn clone_notify(&mut self, _a: &Self::Item) -> impl Future<Output = Result<()>> + Send {
+        async { Ok(()) }
     }
 
     /// Replace this placeholder with the given adapter.
