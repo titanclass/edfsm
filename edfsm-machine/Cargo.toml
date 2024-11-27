@@ -12,6 +12,7 @@ repository.workspace = true
 derive_more = { workspace = true, features = ["from"] }
 embassy-sync = { workspace = true, optional = true }
 futures-util = { workspace = true }
+streambed-codec = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["sync"], optional = true }
 
 edfsm.workspace = true
@@ -23,8 +24,8 @@ streambed-logged = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 
 [features]
-#default = ["tokio", "streambed"]
-default = ["tokio"]
+default = ["tokio", "streambed"]
 embassy = ["dep:embassy-sync"]
 std = []
+streambed = ["dep:streambed-codec"]
 tokio = ["dep:tokio", "std"]
