@@ -7,7 +7,7 @@ members = ["edfsm", "edfsm-macros", "edfsm-kv-store", "edfsm-machine"]
 [workspace.package]
 description = "Event Driven Finite State Machine library"
 readme = "README.md"
-version = "0.7.0"                                         # WHEN CHANGING THIS, CHANGE THE "EDFSM*" DEPENDENCIES BELOW ALSO.
+version = "0.8.0"                                         # WHEN CHANGING THIS, CHANGE THE "EDFSM*" DEPENDENCIES BELOW ALSO.
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/titanclass/edfsm.git"
@@ -28,7 +28,7 @@ streambed-logged = { git = "https://github.com/streambed/streambed-rs.git", rev 
 syn = "1"
 tokio = "1"
 
-edfsm = { path = "edfsm", version = "0.7.0" }
-edfsm-macros = { path = "edfsm-macros", version = "0.7.0" }
-edfsm-kv-store = { path = "edfsm-kv-store", version = "0.7.0" }
-edfsm-machine = { path = "edfsm-machine", version = "0.7.0" }
+edfsm = { path = "edfsm", version = "0.8.0" }
+edfsm-macros = { path = "edfsm-macros", version = "0.8.0" }
+edfsm-kv-store = { path = "edfsm-kv-store", version = "0.8.0" }
+edfsm-machine = { path = "edfsm-machine", version = "0.8.0" }
