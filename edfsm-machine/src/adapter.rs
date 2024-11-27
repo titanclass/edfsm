@@ -112,6 +112,7 @@ where
     }
 
     /// Ignore the reference and avoid the clone.
+    #[allow(clippy::manual_async_fn)]
     fn clone_notify(&mut self, _a: &Self::Item) -> impl Future<Output = Result<()>> + Send {
         async { Ok(()) }
     }
