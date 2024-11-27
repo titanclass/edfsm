@@ -22,7 +22,7 @@ async fn consumer(mut receiver: Receiver<Output>) -> Result<()> {
     Ok(())
 }
 
-fn build() -> impl Machine<M = Counter> {
+fn build() -> impl Machine<Counter> {
     let log = Vec::<Event>::default();
     machine::<Counter>().with_event_log(log)
 }

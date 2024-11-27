@@ -65,13 +65,11 @@ pub type State<M> = <M as Fsm>::S;
 /// - an event is logged if the state changed
 /// - any output messages are dispatched
 ///
-pub trait Machine
+pub trait Machine<M>
 where
-    Self::M: Fsm,
-    Effects<Self::M>: Drain,
+    M: Fsm,
+    Effects<M>: Drain,
 {
-    type M;
-
     /// Return a new `Sender` for the input channel.
     /// Any number can be created , enabling fan-in of messages.
     ///
@@ -81,27 +79,21 @@ where
     ///
     /// `machine.input().adapt_map(Input::Event)`
     ///
-    fn input(&self) -> Sender<In<Self::M>>;
+    fn input(&self) -> Sender<In<M>>;
 
     /// Connect a channel `Sender` or an adapter for output messages.
     ///
     /// This method replaces any existing adapter for output messages.
     /// Note that if the channel or adapter stalls this will stall the state machine.
-    fn with_output(
-        self,
-        output: impl Adapter<Item = Out<Self::M>> + 'static,
-    ) -> impl Machine<M = Self::M>;
+    fn with_output(self, output: impl Adapter<Item = Out<M>> + 'static) -> impl Machine<M>;
 
     /// Connect an additional channel or adapter for output messages.
     ///
     /// Any number of channels or adapters can be connected, enabling fan-out of messages.
     /// Each will receive all output messages, however if an adapter stalls this will stall the state machine.
-    fn merge_output(
-        self,
-        output: impl Adapter<Item = Out<Self::M>> + 'static,
-    ) -> impl Machine<M = Self::M>
+    fn merge_output(self, output: impl Adapter<Item = Out<M>> + 'static) -> impl Machine<M>
     where
-        Out<Self::M>: Clone + Send;
+        Out<M>: Clone + Send;
 
     /// Connect an event log that provides intialisation from historical events and records live events.
     ///
@@ -109,28 +101,25 @@ where
     /// This method replaces any existing event log.
     fn with_event_log(
         self,
-        log: impl Adapter<Item = Event<Self::M>> + Feed<Item = Event<Self::M>> + 'static,
-    ) -> impl Machine<M = Self::M>;
+        log: impl Adapter<Item = Event<M>> + Feed<Item = Event<M>> + 'static,
+    ) -> impl Machine<M>;
 
     /// Connect an additional channel or adapter for events.
     ///
     /// Each event received by the machine and each event produced by a command will be notified.
     /// Any number of channels or adapters can be connected, enabling fan-out of events.
     /// Each will receive all output messages, however if an adapter stalls this will stall the state machine.
-    fn merge_event_log(
-        self,
-        output: impl Adapter<Item = Event<Self::M>> + 'static,
-    ) -> impl Machine<M = Self::M>;
+    fn merge_event_log(self, output: impl Adapter<Item = Event<M>> + 'static) -> impl Machine<M>;
 
     /// Convert this machine into a future that will run as a task
     fn task(self) -> impl Future<Output = Result<()>> + Send + 'static
     where
         Self: Sized,
-        Out<Self::M>: Send,
-        Event<Self::M>: Send,
-        Effects<Self::M>: Init<State<Self::M>> + Send,
-        Command<Self::M>: Send,
-        State<Self::M>: Default + Send;
+        Out<M>: Send,
+        Event<M>: Send,
+        Effects<M>: Init<State<M>> + Send,
+        Command<M>: Send,
+        State<M>: Default + Send;
 }
 
 /// A concrete `Machine`
@@ -146,7 +135,7 @@ where
     events: P,
 }
 
-impl<M, N, O, P> Machine for Template<M, N, O, P>
+impl<M, N, O, P> Machine<M> for Template<M, N, O, P>
 where
     M: Fsm + 'static,
     Effects<M>: Drain,
@@ -155,16 +144,11 @@ where
     P: Adapter<Item = Event<M>> + 'static,
     Event<M>: Clone + Send,
 {
-    type M = M;
-
-    fn input(&self) -> Sender<In<Self::M>> {
+    fn input(&self) -> Sender<In<M>> {
         self.sender.as_ref().unwrap().clone()
     }
 
-    fn with_output(
-        self,
-        output: impl Adapter<Item = Out<Self::M>> + 'static,
-    ) -> impl Machine<M = Self::M> {
+    fn with_output(self, output: impl Adapter<Item = Out<M>> + 'static) -> impl Machine<M> {
         Template {
             sender: self.sender,
             receiver: self.receiver,
@@ -175,12 +159,9 @@ where
         }
     }
 
-    fn merge_output(
-        self,
-        output: impl Adapter<Item = Out<Self::M>> + 'static,
-    ) -> impl Machine<M = Self::M>
+    fn merge_output(self, output: impl Adapter<Item = Out<M>> + 'static) -> impl Machine<M>
     where
-        Out<Self::M>: Clone + Send,
+        Out<M>: Clone + Send,
     {
         Template {
             sender: self.sender,
@@ -194,8 +175,8 @@ where
 
     fn with_event_log(
         self,
-        log: impl Adapter<Item = Event<Self::M>> + Feed<Item = Event<Self::M>> + 'static,
-    ) -> impl Machine<M = Self::M> {
+        log: impl Adapter<Item = Event<M>> + Feed<Item = Event<M>> + 'static,
+    ) -> impl Machine<M> {
         Template {
             sender: self.sender,
             receiver: self.receiver,
@@ -206,10 +187,7 @@ where
         }
     }
 
-    fn merge_event_log(
-        self,
-        events: impl Adapter<Item = Event<Self::M>> + 'static,
-    ) -> impl Machine<M = Self::M> {
+    fn merge_event_log(self, events: impl Adapter<Item = Event<M>> + 'static) -> impl Machine<M> {
         Template {
             sender: self.sender,
             receiver: self.receiver,
@@ -222,8 +200,8 @@ where
 
     async fn task(mut self) -> Result<()>
     where
-        Effects<Self::M>: Init<State<Self::M>>,
-        State<Self::M>: Default,
+        Effects<M>: Init<State<M>>,
+        State<M>: Default,
         Event<M>: Send,
         State<M>: Send,
     {
@@ -265,7 +243,7 @@ where
 pub const DEFAULT_BUFFER: usize = 10;
 
 /// Create new machine for an `Fsm` of type `M`
-pub fn machine<M>() -> impl Machine<M = M>
+pub fn machine<M>() -> impl Machine<M>
 where
     M: Fsm + 'static,
     Effects<M>: Drain + Default,
@@ -276,7 +254,7 @@ where
 }
 
 /// Create a new machine for an `Fsm` of type `M` with explicit effects and backlog
-pub fn machine_with_effects<M>(effects: Effects<M>, buffer: usize) -> impl Machine<M = M>
+pub fn machine_with_effects<M>(effects: Effects<M>, buffer: usize) -> impl Machine<M>
 where
     M: Fsm + 'static,
     Effects<M>: Drain,
