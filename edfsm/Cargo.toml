@@ -1,0 +1,12 @@
+[package]
+name = "edfsm"
+description = "Event Driven Finite State Machine library"
+readme = "README.md"
+
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+edfsm-macros.workspace = true

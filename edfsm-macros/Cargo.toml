@@ -1,0 +1,18 @@
+[package]
+name = "edfsm-macros"
+description = "Macros for the Event Driven Finite State Machine library"
+readme = "README.md"
+
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = { workspace = true }
+proc-macro-error = { workspace = true }
+quote = { workspace = true }
+syn = { workspace = true, features = ["full", "extra-traits"] }
