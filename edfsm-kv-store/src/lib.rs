@@ -68,10 +68,10 @@ pub enum Query<V, E> {
 }
 
 /// Type of a function that will respond to an many-valued query.
-type RespondMany<V, E> = Box<dyn FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> E + Send>;
+pub type RespondMany<V, E> = Box<dyn FnOnce(&mut dyn Iterator<Item = (&Path, &V)>) -> E + Send>;
 
 /// Type of a function that will respond to a single valued query.
-type RespondOne<V, E> = Box<dyn FnOnce(Option<&V>) -> E + Send>;
+pub type RespondOne<V, E> = Box<dyn FnOnce(Option<&V>) -> E + Send>;
 
 /// `KvStore<M>` represents the collection of state machines of type `M`.
 ///
