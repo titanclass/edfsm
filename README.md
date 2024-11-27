@@ -145,6 +145,12 @@ Please see the event_driven/tests folder for complete examples, including the ab
 the passed state in the absence of a target state i.e. when emitting an event but not
 transitioning.
 
+edfsm-machine and edfsm-kv-store
+---
+
+These two crates provide a means to conveniently run an FSM of `edfsm` as a future, and also to
+use an FSM as a key/value store respectively.
+
 no_std
 ---
 
