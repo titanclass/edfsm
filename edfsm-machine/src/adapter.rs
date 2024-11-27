@@ -265,7 +265,7 @@ mod adapt_streambed {
     where
         C: Codec<A> + Sync + Send,
         L: CommitLog + Sync + Send,
-        A: Send + Sync + Clone + 'static,
+        A: Send + Sync + 'static,
     {
         type Item = A;
 
@@ -282,7 +282,7 @@ mod adapt_streambed {
     where
         C: Codec<A> + Sync + Send,
         L: CommitLog + Sync + Send,
-        A: Send + Sync + Clone,
+        A: Sync + Send,
     {
         type Item = A;
 
