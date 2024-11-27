@@ -12,7 +12,7 @@ members = [
 [workspace.package]
 description = "Event Driven Finite State Machine library"
 readme = "README.md"
-version = "0.7.0"
+version = "0.7.0"                                            # WHEN CHANGING THIS, CHANGE THE "EDFSM*" DEPENDENCIES BELOW ALSO.
 edition = "2021"
 license = "Apache-2.0"
 repository = "https://github.com/titanclass/edfsm.git"
