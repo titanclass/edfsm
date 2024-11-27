@@ -23,8 +23,8 @@ serde = "1"
 serde_json = "1"
 serde_qs = "0.13"
 smol_str = "0.3.2"
-streambed-codec = { git = "https://github.com/streambed/streambed-rs.git", rev = "3494d415120fa6d126200a779ce9cee007061715" }
-streambed-logged = { git = "https://github.com/streambed/streambed-rs.git", rev = "3494d415120fa6d126200a779ce9cee007061715" }
+streambed-codec = "0.12.0"
+streambed-logged = "0.12.0"
 syn = "1"
 tokio = "1"
 
