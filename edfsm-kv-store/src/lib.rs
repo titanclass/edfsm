@@ -193,6 +193,12 @@ where
     }
 }
 
+impl<A> Terminating for Keyed<A> {
+    fn terminating(&self) -> bool {
+        false
+    }
+}
+
 impl<S, SE> Init<S> for Keyed<SE> {
     fn init(&mut self, _state: &S) {}
 }

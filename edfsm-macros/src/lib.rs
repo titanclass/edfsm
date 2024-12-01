@@ -70,7 +70,6 @@ use syn::parse2;
 /// ```
 ///
 /// The `/ action` is optional and is used to declare that a side-effect is to be performed.
-
 #[proc_macro_attribute]
 #[proc_macro_error]
 pub fn impl_fsm(input: TokenStream, annotated_item: TokenStream) -> TokenStream {
