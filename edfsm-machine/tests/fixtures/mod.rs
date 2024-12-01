@@ -14,6 +14,7 @@ pub enum Command {
 pub enum Event {
     Tick,
     Reset,
+    Stop,
 }
 
 #[derive(Clone, Debug)]
@@ -54,6 +55,7 @@ impl Fsm for Counter {
                     Some(Change::Updated)
                 }
             }
+            Event::Stop => Some(Change::Transitioned),
         }
     }
 
@@ -66,6 +68,6 @@ impl Fsm for Counter {
 
 impl Terminating for Event {
     fn terminating(&self) -> bool {
-        false
+        matches!(*self, Event::Stop)
     }
 }
