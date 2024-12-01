@@ -17,7 +17,7 @@ use crate::{
     error::Result,
 };
 use core::future::Future;
-use edfsm::{Drain, Fsm, Init, Input};
+use edfsm::{Drain, Fsm, Init, Input, Terminating};
 
 /// The event type of an Fsm
 pub type Event<M> = <M as Fsm>::E;
@@ -116,7 +116,7 @@ where
     where
         Self: Sized,
         Out<M>: Send,
-        Event<M>: Send,
+        Event<M>: Send + Terminating,
         Effects<M>: Init<State<M>> + Send,
         Command<M>: Send,
         State<M>: Default + Send;
@@ -202,7 +202,7 @@ where
     where
         Effects<M>: Init<State<M>>,
         State<M>: Default,
-        Event<M>: Send,
+        Event<M>: Send + Terminating,
         State<M>: Send,
     {
         // close the local sender side of the input channel
@@ -224,8 +224,12 @@ where
 
         // Read events and commands
         while let Some(input) = self.receiver.recv().await {
+            // Indicates a terminating event is seen
+            let mut terminating = false;
+
             // Run Fsm and log any event
             if let Some(e) = M::step(&mut state, input, &mut self.effects) {
+                terminating = e.terminating();
                 self.log.clone_notify(&e).await?;
                 self.events.notify(e).await?;
             }
@@ -233,6 +237,10 @@ where
             // Flush output messages generated during the `step`, if any.
             for item in self.effects.drain_all() {
                 self.output.notify(item).await?
+            }
+
+            if terminating {
+                break;
             }
         }
         Ok(())
