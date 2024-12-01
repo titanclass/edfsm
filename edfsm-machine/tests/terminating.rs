@@ -11,7 +11,7 @@ async fn producer(sender: Sender<Input<Command, Event>>) -> Result<()> {
     for _ in 1..50 {
         sender.send(Input::Event(Event::Tick)).await?;
     }
-    // sender.send(Input::Event(Event::Stop)).await?;
+    sender.send(Input::Event(Event::Stop)).await?;
     for _ in 50..100 {
         sender.send(Input::Event(Event::Tick)).await?;
     }
