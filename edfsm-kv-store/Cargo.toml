@@ -28,8 +28,6 @@ serde_json = { workspace = true }
 serde_qs = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 
-edfsm-machine = { workspace = true }
-
 [features]
 default = ["tokio"]
 tokio = ["dep:tokio", "dep:edfsm-machine", "std"]
