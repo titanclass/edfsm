@@ -30,4 +30,4 @@ tokio = "1"
 
 edfsm = { path = "edfsm", version = "0.8.1" }
 edfsm-macros = { path = "edfsm-macros", version = "0.8.1" }
-edfsm-machine = { path = "edfsm-machine", default-features = false, version = "0.8.1" }
+edfsm-machine = { path = "edfsm-machine", version = "0.8.1" }

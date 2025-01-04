@@ -19,7 +19,7 @@ edfsm.workspace = true
 
 [dev-dependencies]
 derive_more = { workspace = true, features = ["try_into"] }
-edfsm-machine = { path = ".", features = ["streambed"] }
+edfsm-machine = { workspace = true, features = ["streambed"] }
 serde = { workspace = true }
 streambed-logged = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
