@@ -19,12 +19,13 @@ edfsm.workspace = true
 
 [dev-dependencies]
 derive_more = { workspace = true, features = ["try_into"] }
+edfsm-machine = { path = ".", features = ["streambed"] }
 serde = { workspace = true }
 streambed-logged = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 
 [features]
-default = ["tokio", "streambed"]
+default = ["tokio"]
 embassy = ["dep:embassy-sync"]
 std = []
 streambed = ["dep:streambed-codec"]
