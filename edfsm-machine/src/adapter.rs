@@ -11,13 +11,13 @@ pub trait Adapter: Send {
 
     /// Forward the given item to an asynchronous consumer, possibly converting the type
     /// or possibly dropping the item if it cannot be converted.
-    fn notify(&mut self, a: Self::Item) -> impl Future<Output = Result<()>> + Send
+    fn notify(&mut self, a: Self::Item) -> impl Future<Output = ()> + Send
     where
         Self::Item: 'static;
 
     /// Clone the referenced item and then forward it to an asynchonous consumer.
     /// The clone operation can is avoid in the `Placeholder` implementation.
-    fn clone_notify(&mut self, a: &Self::Item) -> impl Future<Output = Result<()>> + Send
+    fn clone_notify(&mut self, a: &Self::Item) -> impl Future<Output = ()> + Send
     where
         Self::Item: Clone + 'static,
     {
@@ -107,14 +107,12 @@ where
     type Item = A;
 
     /// Discard the item
-    async fn notify(&mut self, _e: Self::Item) -> Result<()> {
-        Ok(())
-    }
+    async fn notify(&mut self, _e: Self::Item) {}
 
     /// Ignore the reference and avoid the clone.
     #[allow(clippy::manual_async_fn)]
-    fn clone_notify(&mut self, _a: &Self::Item) -> impl Future<Output = Result<()>> + Send {
-        async { Ok(()) }
+    fn clone_notify(&mut self, _a: &Self::Item) -> impl Future<Output = ()> + Send {
+        async {}
     }
 
     /// Replace this placeholder with the given adapter.
@@ -141,11 +139,11 @@ where
 {
     type Item = A;
 
-    async fn notify(&mut self, a: Self::Item) -> Result<()>
+    async fn notify(&mut self, a: Self::Item)
     where
         Self::Item: 'static,
     {
-        self.first.notify(a.clone()).await?;
+        self.first.notify(a.clone()).await;
         self.next.notify(a).await
     }
 }
@@ -168,14 +166,13 @@ where
 {
     type Item = A;
 
-    async fn notify(&mut self, a: Self::Item) -> Result<()>
+    async fn notify(&mut self, a: Self::Item)
     where
         Self::Item: 'static,
     {
         if let Some(b) = (self.func)(a) {
-            self.inner.notify(b).await?;
+            self.inner.notify(b).await;
         }
-        Ok(())
     }
 }
 
@@ -187,12 +184,11 @@ where
 {
     type Item = A;
 
-    async fn notify(&mut self, a: Self::Item) -> Result<()>
+    async fn notify(&mut self, a: Self::Item)
     where
         Self::Item: 'static,
     {
         self.push(a);
-        Ok(())
     }
 }
 
@@ -206,7 +202,7 @@ where
 
     async fn feed(&self, output: &mut impl Adapter<Item = Self::Item>) -> Result<()> {
         for a in self.iter().cloned() {
-            output.notify(a).await?;
+            output.notify(a).await;
         }
         Ok(())
     }
@@ -215,7 +211,7 @@ where
 /// Implementations of  `Adapter` for tokio channels.
 #[cfg(feature = "tokio")]
 pub mod adapt_tokio {
-    use crate::{adapter::Adapter, error::Result};
+    use crate::adapter::Adapter;
     use tokio::sync::{broadcast, mpsc};
 
     impl<A> Adapter for mpsc::Sender<A>
@@ -224,9 +220,8 @@ pub mod adapt_tokio {
     {
         type Item = A;
 
-        async fn notify(&mut self, a: Self::Item) -> Result<()> {
-            self.send(a).await?;
-            Ok(())
+        async fn notify(&mut self, a: Self::Item) {
+            let _ = self.send(a).await;
         }
     }
 
@@ -236,9 +231,8 @@ pub mod adapt_tokio {
     {
         type Item = A;
 
-        async fn notify(&mut self, a: Self::Item) -> Result<()> {
-            self.send(a)?;
-            Ok(())
+        async fn notify(&mut self, a: Self::Item) {
+            let _ = self.send(a);
         }
     }
 }
@@ -287,7 +281,7 @@ mod adapt_streambed {
         async fn feed(&self, output: &mut impl Adapter<Item = Self::Item>) -> Result<()> {
             let mut s = self.history().await;
             while let Some(a) = s.next().await {
-                output.notify(a).await?;
+                output.notify(a).await;
             }
             Ok(())
         }
@@ -301,12 +295,11 @@ mod adapt_streambed {
     {
         type Item = A;
 
-        async fn notify(&mut self, a: Self::Item) -> Result<()>
+        async fn notify(&mut self, a: Self::Item)
         where
             Self::Item: 'static,
         {
-            self.produce(a).await?;
-            Ok(())
+            let _ = self.produce(a).await;
         }
     }
 }
