@@ -292,7 +292,7 @@ where
     state: &'a mut State<M>,
 }
 
-impl<'a, M> Adapter for Hydrator<'a, M>
+impl<M> Adapter for Hydrator<'_, M>
 where
     M: Fsm,
     Event<M>: Send,
