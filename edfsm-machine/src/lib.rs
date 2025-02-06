@@ -219,7 +219,7 @@ where
 
         // Flush output messages generated in initialisation
         for item in self.effects.drain_all() {
-            self.output.notify(item).await?
+            self.output.notify(item).await
         }
 
         // Read events and commands
@@ -230,13 +230,13 @@ where
             // Run Fsm and log any event
             if let Some(e) = M::step(&mut state, input, &mut self.effects) {
                 terminating = e.terminating();
-                self.log.clone_notify(&e).await?;
-                self.events.notify(e).await?;
+                self.log.clone_notify(&e).await;
+                self.events.notify(e).await;
             }
 
             // Flush output messages generated during the `step`, if any.
             for item in self.effects.drain_all() {
-                self.output.notify(item).await?
+                self.output.notify(item).await
             }
 
             if terminating {
@@ -292,7 +292,7 @@ where
     state: &'a mut State<M>,
 }
 
-impl<'a, M> Adapter for Hydrator<'a, M>
+impl<M> Adapter for Hydrator<'_, M>
 where
     M: Fsm,
     Event<M>: Send,
@@ -300,11 +300,10 @@ where
 {
     type Item = Event<M>;
 
-    async fn notify(&mut self, a: Self::Item) -> Result<()>
+    async fn notify(&mut self, a: Self::Item)
     where
         Self::Item: Send + 'static,
     {
         M::on_event(self.state, &a);
-        Ok(())
     }
 }

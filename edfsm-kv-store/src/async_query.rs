@@ -98,7 +98,7 @@ where
     }
 
     async fn dispatch<R>(&mut self, query: Query<V, E>, rx: oneshot::Receiver<R>) -> Result<R> {
-        self.0.notify(Input::Command(query)).await?;
+        self.0.notify(Input::Command(query)).await;
         Ok(rx.await?)
     }
 }
