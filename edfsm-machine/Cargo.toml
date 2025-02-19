@@ -9,13 +9,14 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+async-broadcast = { workspace = true, optional = true }
 derive_more = { workspace = true, features = ["from"] }
+edfsm.workspace = true
 embassy-sync = { workspace = true, optional = true }
 futures-util = { workspace = true }
 streambed-codec = { workspace = true, optional = true }
 tokio = { workspace = true, features = ["sync"], optional = true }
 
-edfsm.workspace = true
 
 [dev-dependencies]
 derive_more = { workspace = true, features = ["try_into"] }
@@ -25,8 +26,9 @@ streambed-logged = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 
 [features]
-default = ["tokio"]
+default = ["tokio", "async-broadcast"]
 embassy = ["dep:embassy-sync"]
 std = []
 streambed = ["dep:streambed-codec"]
 tokio = ["dep:tokio", "std"]
+async-broadcast = ["dep:async-broadcast", "std"]
