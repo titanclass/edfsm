@@ -237,6 +237,18 @@ pub mod adapt_tokio {
     }
 }
 
+#[cfg(feature = "async-broadcast")]
+impl<A> Adapter for async_broadcast::Sender<A>
+where
+    A: Send + Clone,
+{
+    type Item = A;
+
+    async fn notify(&mut self, a: Self::Item) {
+        let _ = self.broadcast(a).await;
+    }
+}
+
 /// A source of messages that can `feed` an `Adapter`.
 pub trait Feed {
     type Item;
