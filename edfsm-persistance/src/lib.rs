@@ -1,9 +1,10 @@
 pub mod error;
 use edfsm_machine::adapter::{Adapter, Feed};
+use edfsm_machine::error as mach_error;
 pub use error::Result;
 use rusqlite::{Connection, OptionalExtension};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{future::Future, marker::PhantomData, ops::Range, path::Path, usize};
+use std::{marker::PhantomData, ops::Range, path::Path, usize};
 use tokio::{sync::Mutex, task::block_in_place};
 
 pub trait Persistable
@@ -187,24 +188,25 @@ impl<A> BackingStore<A> {
 #[derive(Debug)]
 pub struct AsyncBackingStore<A>(Mutex<BackingStore<A>>);
 
+impl<A> AsyncBackingStore<A> {
+    pub fn new(store: BackingStore<A>) -> Self {
+        Self(Mutex::new(store))
+    }
+}
+
 impl<A> Feed for AsyncBackingStore<A>
 where
     A: DeserializeOwned + Send + Sync + 'static,
 {
     type Item = A;
 
-    fn feed(
-        &self,
-        sink: &mut impl Adapter<Item = Self::Item>,
-    ) -> impl Future<Output = edfsm_machine::error::Result<()>> + Send {
-        async {
-            let mut store = self.0.lock().await;
-            let values = block_in_place(|| store.history())?;
-            for item in values {
-                sink.notify(item).await;
-            }
-            Ok(())
+    async fn feed(&self, sink: &mut impl Adapter<Item = Self::Item>) -> mach_error::Result<()> {
+        let mut store = self.0.lock().await;
+        let values = block_in_place(|| store.history())?;
+        for item in values {
+            sink.notify(item).await;
         }
+        Ok(())
     }
 }
 
