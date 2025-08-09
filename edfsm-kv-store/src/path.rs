@@ -1,5 +1,5 @@
-use alloc::{string::String, vec::Vec};
-use core::{ops::Div, slice::Iter};
+use alloc::{string::String, string::ToString, vec::Vec};
+use core::{fmt::Display, ops::Div, slice::Iter};
 use derive_more::{
     derive::{Deref, IntoIterator},
     From, TryInto,
@@ -78,6 +78,29 @@ where
     }
 }
 
+impl Display for Path {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut buffer = String::new();
+        for item in self.iter() {
+            buffer.push('/');
+            match item {
+                PathItem::Number(n) => {
+                    url_escape::encode_component_to_string(n.to_string(), &mut buffer);
+                }
+                PathItem::Name(c) => {
+                    if let Some(x) = c.chars().next() {
+                        if x.is_ascii_digit() || x == '\'' {
+                            buffer.push('\'');
+                        }
+                    }
+                    url_escape::encode_component_to_string(c, &mut buffer);
+                }
+            }
+        }
+        f.write_str(&buffer)
+    }
+}
+
 /// One element of a `Path` can be a number or a name.
 #[derive(
     PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From, Serialize, Deserialize, Hash, TryInto,
@@ -103,7 +126,7 @@ impl From<String> for PathItem {
 #[cfg(test)]
 mod test {
     use super::{root, Path, PathItem};
-    use alloc::format;
+    use alloc::{format, string::ToString};
     use smol_str::SmolStr;
 
     #[test]
@@ -167,5 +190,29 @@ mod test {
         let p = root() / "CSMS" / 65 / "EVSE" / 2;
         let s = serde_qs::to_string(&p).unwrap();
         assert_eq!(s, "0=CSMS&1=65&2=EVSE&3=2");
+    }
+
+    #[test]
+    fn url_encode_2() {
+        let p = root() / "CS" / 1;
+        assert_eq!(p.to_string(), "/CS/1");
+    }
+
+    #[test]
+    fn url_encode_3() {
+        let p = root() / "CS/MS" / 65 / "EV?S&E" / 2;
+        assert_eq!(p.to_string(), "/CS%2FMS/65/EV%3FS%26E/2");
+    }
+
+    #[test]
+    fn url_encode_4() {
+        let p = root() / "CS" / "2";
+        assert_eq!(p.to_string(), "/CS/'2");
+    }
+
+    #[test]
+    fn url_encode_5() {
+        let p = root() / "'CS" / 2;
+        assert_eq!(p.to_string(), "/''CS/2");
     }
 }

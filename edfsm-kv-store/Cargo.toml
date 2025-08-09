@@ -19,12 +19,13 @@ embassy-sync = { workspace = true, optional = true }
 serde = { workspace = true, features = ["derive"] }
 smol_str = { workspace = true, features = ["serde"] }
 tokio = { workspace = true, features = ["sync"], optional = true }
+url-escape = { workspace = true }
 
 edfsm = { workspace = true }
 edfsm-machine = { workspace = true, optional = true }
 
 [dev-dependencies]
-edfsm-machine = { workspace = true }	
+edfsm-machine = { workspace = true }
 serde_json = { workspace = true }
 serde_qs = { workspace = true }
 tokio = { workspace = true, features = ["full"] }

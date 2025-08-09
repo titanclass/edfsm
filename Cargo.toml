@@ -28,6 +28,7 @@ streambed-codec = "0.13.0"
 streambed-logged = "0.13.0"
 syn = "1"
 tokio = "1"
+url-escape = "0.1"
 
 edfsm = { path = "edfsm", version = "0.11.0" }
 edfsm-macros = { path = "edfsm-macros", version = "0.11.0" }
