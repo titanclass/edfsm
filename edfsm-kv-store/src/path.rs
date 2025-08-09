@@ -117,7 +117,7 @@ impl FromStr for Path {
         let mut path = Self::root();
         let raw_path_items = s.split('/');
         let mut parsed_first = false;
-        let mut decode_buffer = String::new();
+        let mut decode_buffer = String::with_capacity(s.len());
         for raw_path_item in raw_path_items {
             if parsed_first {
                 let mut raw_path_item_iter = raw_path_item.chars();
