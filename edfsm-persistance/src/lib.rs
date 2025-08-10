@@ -2,7 +2,7 @@ pub mod error;
 use edfsm_machine::adapter::{Adapter, Feed};
 use edfsm_machine::error as mach_error;
 pub use error::Result;
-use rusqlite::{Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, Params};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{marker::PhantomData, ops::Range, path::Path, usize};
 use tokio::{sync::Mutex, task::block_in_place};
@@ -120,24 +120,41 @@ impl<A> BackingStore<A> {
         Ok(())
     }
 
-    const SELECT_COMPACT: &str = "SELECT value FROM compact ORDER BY offset";
+    const SELECT_LOG: &str = "SELECT value FROM log ORDER BY offset";
+    const SELECT_COMPACT_ALL: &str = "SELECT value FROM compact ORDER BY offset";
+    const SELECT_COMPACT_TAIL: &str = "SELECT value FROM compact ORDER BY offset WHERE offset > ?";
 
-    pub fn history(&mut self) -> Result<impl Iterator<Item = A>>
+    fn query_events<P>(&self, sql: &str, params: P, values: &mut Vec<A>) -> Result<()>
     where
         A: DeserializeOwned,
+        P: Params,
     {
-        self.compact()?;
-
-        let mut values: Vec<A> = Vec::new();
-        let mut statement = self.connection.prepare_cached(Self::SELECT_COMPACT)?;
-        let mut rows = statement.query(())?;
+        let mut statement: rusqlite::CachedStatement<'_> = self.connection.prepare_cached(sql)?;
+        let mut rows = statement.query(params)?;
 
         while let Some(row) = rows.next()? {
             let text: String = row.get(0)?;
             let item: A = serde_json::from_str(&*text)?;
             values.push(item);
         }
-        Ok(values.into_iter())
+        Ok(())
+    }
+
+    pub fn history(&mut self) -> Result<Vec<A>>
+    where
+        A: DeserializeOwned,
+    {
+        let mut values: Vec<A> = Vec::new();
+
+        if self.log_range.is_empty() {
+            self.query_events(Self::SELECT_COMPACT_ALL, (), &mut values)?;
+        } else {
+            let breakpoint = self.log_range.end - 1;
+            self.query_events(Self::SELECT_LOG, (), &mut values)?;
+            self.query_events(Self::SELECT_COMPACT_TAIL, (breakpoint,), &mut values)?;
+        }
+
+        Ok(values)
     }
 
     const CREATE_LOG: &str = "CREATE TABLE IF NOT EXISTS log (
@@ -202,7 +219,10 @@ where
 
     async fn feed(&self, sink: &mut impl Adapter<Item = Self::Item>) -> mach_error::Result<()> {
         let mut store = self.0.lock().await;
-        let values = block_in_place(|| store.history())?;
+        let values = block_in_place(|| {
+            store.compact()?;
+            store.history()
+        })?;
         for item in values {
             sink.notify(item).await;
         }
