@@ -1,5 +1,5 @@
-use alloc::{string::String, vec::Vec};
-use core::{ops::Div, slice::Iter};
+use alloc::{string::String, string::ToString, vec::Vec};
+use core::{fmt::Display, ops::Div, slice::Iter, str::FromStr};
 use derive_more::{
     derive::{Deref, IntoIterator},
     From, TryInto,
@@ -78,6 +78,68 @@ where
     }
 }
 
+impl Display for Path {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut buffer = String::new();
+        for item in self.iter() {
+            buffer.push('/');
+            match item {
+                PathItem::Number(n) => {
+                    url_escape::encode_component_to_string(n.to_string(), &mut buffer);
+                }
+                PathItem::Name(c) => {
+                    if let Some(x) = c.chars().next() {
+                        if x.is_ascii_digit() || x == '\'' {
+                            buffer.push('\'');
+                        }
+                    }
+                    url_escape::encode_component_to_string(c, &mut buffer);
+                }
+            }
+        }
+        f.write_str(&buffer)
+    }
+}
+
+#[derive(Debug, PartialEq)]
+pub enum ParseError {
+    NoRoot,
+    BadInt(core::num::ParseIntError),
+}
+
+impl FromStr for Path {
+    type Err = ParseError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if !s.starts_with('/') {
+            return Err(ParseError::NoRoot);
+        }
+        let mut path = Self::root();
+        let mut raw_path_items = s.split('/');
+        let _ = raw_path_items.next();
+        let mut decode_buffer = String::with_capacity(s.len());
+        for raw_path_item in raw_path_items {
+            let mut raw_path_item_iter = raw_path_item.chars();
+            let path_item = match raw_path_item_iter.next() {
+                Some(c) if c.is_ascii_digit() => {
+                    PathItem::Number(raw_path_item.parse().map_err(ParseError::BadInt)?)
+                }
+                Some('\'') => {
+                    url_escape::decode_to_string(raw_path_item_iter.as_str(), &mut decode_buffer);
+                    PathItem::Name(SmolStr::from(&decode_buffer))
+                }
+                _ => {
+                    url_escape::decode_to_string(raw_path_item, &mut decode_buffer);
+                    PathItem::Name(SmolStr::from(&decode_buffer))
+                }
+            };
+            path.push(path_item);
+            decode_buffer.clear();
+        }
+        Ok(path)
+    }
+}
+
 /// One element of a `Path` can be a number or a name.
 #[derive(
     PartialEq, Eq, PartialOrd, Ord, Clone, Debug, From, Serialize, Deserialize, Hash, TryInto,
@@ -102,8 +164,10 @@ impl From<String> for PathItem {
 
 #[cfg(test)]
 mod test {
+    use crate::path::ParseError;
+
     use super::{root, Path, PathItem};
-    use alloc::format;
+    use alloc::{format, string::ToString};
     use smol_str::SmolStr;
 
     #[test]
@@ -167,5 +231,66 @@ mod test {
         let p = root() / "CSMS" / 65 / "EVSE" / 2;
         let s = serde_qs::to_string(&p).unwrap();
         assert_eq!(s, "0=CSMS&1=65&2=EVSE&3=2");
+    }
+
+    #[test]
+    fn to_string_1() {
+        let p = root() / "CS" / 1;
+        assert_eq!(p.to_string(), "/CS/1");
+    }
+
+    #[test]
+    fn to_string_2() {
+        let p = root() / "CS/MS" / 65 / "EV?S&E" / 2;
+        assert_eq!(p.to_string(), "/CS%2FMS/65/EV%3FS%26E/2");
+    }
+
+    #[test]
+    fn to_string_3() {
+        let p = root() / "CS" / "2";
+        assert_eq!(p.to_string(), "/CS/'2");
+    }
+
+    #[test]
+    fn to_string_4() {
+        let p = root() / "'CS" / 2;
+        assert_eq!(p.to_string(), "/''CS/2");
+    }
+
+    #[test]
+    fn from_string_1() {
+        let p = root() / "CS" / 1;
+        assert_eq!("/CS/1".parse(), Ok(p));
+    }
+
+    #[test]
+    fn from_string_2() {
+        let p = root() / "CS/MS" / 65 / "EV?S&E" / 2;
+        assert_eq!("/CS%2FMS/65/EV%3FS%26E/2".parse(), Ok(p));
+    }
+
+    #[test]
+    fn from_string_3() {
+        let p = root() / "CS" / "2";
+        assert_eq!("/CS/'2".parse(), Ok(p));
+    }
+
+    #[test]
+    fn from_string_4() {
+        let p = root() / "'CS" / 2;
+        assert_eq!("/''CS/2".parse(), Ok(p));
+    }
+
+    #[test]
+    fn from_string_no_root_err() {
+        assert_eq!("CS".parse::<Path>(), Err(ParseError::NoRoot));
+    }
+
+    #[test]
+    fn from_string_bad_int_err() {
+        assert!(matches!(
+            "/1n".parse::<Path>(),
+            Err(ParseError::BadInt(core::num::ParseIntError { .. }))
+        ));
     }
 }
