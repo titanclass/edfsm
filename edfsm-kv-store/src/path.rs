@@ -115,33 +115,26 @@ impl FromStr for Path {
             return Err(ParseError::NoRoot);
         }
         let mut path = Self::root();
-        let raw_path_items = s.split('/');
-        let mut parsed_first = false;
+        let mut raw_path_items = s.split('/');
+        let _ = raw_path_items.next();
         let mut decode_buffer = String::with_capacity(s.len());
         for raw_path_item in raw_path_items {
-            if parsed_first {
-                let mut raw_path_item_iter = raw_path_item.chars();
-                let path_item = match raw_path_item_iter.next() {
-                    Some(c) if c.is_ascii_digit() => {
-                        PathItem::Number(raw_path_item.parse().map_err(ParseError::BadInt)?)
-                    }
-                    Some('\'') => {
-                        url_escape::decode_to_string(
-                            raw_path_item_iter.as_str(),
-                            &mut decode_buffer,
-                        );
-                        PathItem::Name(SmolStr::from(&decode_buffer))
-                    }
-                    _ => {
-                        url_escape::decode_to_string(raw_path_item, &mut decode_buffer);
-                        PathItem::Name(SmolStr::from(&decode_buffer))
-                    }
-                };
-                path.push(path_item);
-                decode_buffer.clear();
-            } else {
-                parsed_first = true
-            }
+            let mut raw_path_item_iter = raw_path_item.chars();
+            let path_item = match raw_path_item_iter.next() {
+                Some(c) if c.is_ascii_digit() => {
+                    PathItem::Number(raw_path_item.parse().map_err(ParseError::BadInt)?)
+                }
+                Some('\'') => {
+                    url_escape::decode_to_string(raw_path_item_iter.as_str(), &mut decode_buffer);
+                    PathItem::Name(SmolStr::from(&decode_buffer))
+                }
+                _ => {
+                    url_escape::decode_to_string(raw_path_item, &mut decode_buffer);
+                    PathItem::Name(SmolStr::from(&decode_buffer))
+                }
+            };
+            path.push(path_item);
+            decode_buffer.clear();
         }
         Ok(path)
     }
