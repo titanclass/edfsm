@@ -12,3 +12,5 @@ by executors such as those provided by [tokio](https://github.com/tokio-rs/tokio
 
 Taking this further, a machine's inputs can be conveniently sourced from a [streambed-logged](https://github.com/streambed/streambed-rs/tree/main/streambed-logged)
 log of events that have been persisted, and logged back there. These adaptations provides an [event-sourcing](https://martinfowler.com/eaaDev/EventSourcing.html)-based Actor Model.
+
+This library assumes no_std and requires features such as `tokio` to make it useful.
