@@ -1,5 +1,5 @@
+use alloc::vec::Vec;
 use edfsm::{Drain, Init};
-use std::vec::Vec;
 
 #[derive(Debug)]
 pub struct OutputBuffer<A>(pub Vec<A>);

@@ -1,12 +1,14 @@
 #![doc = include_str!("../README.md")]
 #![no_std]
+#[cfg(feature = "alloc")]
+extern crate alloc;
 #[cfg(feature = "std")]
 extern crate std;
 
 pub mod adapter;
 pub mod error;
 
-#[cfg(feature = "std")]
+#[cfg(feature = "alloc")]
 pub mod output;
 
 #[cfg(feature = "tokio")]

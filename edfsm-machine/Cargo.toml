@@ -27,8 +27,9 @@ tokio = { workspace = true, features = ["full"] }
 
 [features]
 default = ["tokio", "async-broadcast"]
+alloc = []
 embassy = ["dep:embassy-sync"]
-std = []
+std = ["alloc"]
 streambed = ["dep:streambed-codec"]
 tokio = ["dep:tokio", "std"]
 async-broadcast = ["dep:async-broadcast", "std"]
