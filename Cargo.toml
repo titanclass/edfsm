@@ -2,7 +2,7 @@
 
 resolver = "2"
 
-members = ["edfsm", "edfsm-macros", "edfsm-kv-store", "edfsm-machine"]
+members = ["edfsm", "edfsm-macros", "edfsm-kv-store", "edfsm-machine", "edfsm-persistance"]
 
 [workspace.package]
 description = "Event Driven Finite State Machine library"
@@ -20,6 +20,7 @@ futures-util = "0.3"
 proc-macro2 = "1"
 proc-macro-error = "1"
 quote = "1"
+rusqlite = "0.34"
 serde = "1"
 serde_json = "1"
 serde_qs = "0.13"
