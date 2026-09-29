@@ -1,11 +1,43 @@
-use alloc::{string::String, string::ToString, vec::Vec};
-use core::{fmt::Display, ops::Div, slice::Iter, str::FromStr};
+use alloc::{string::String, vec::Vec};
+use core::{
+    fmt::{Display, Write as _},
+    ops::Div,
+    slice::Iter,
+    str::FromStr,
+};
 use derive_more::{
     derive::{Deref, IntoIterator},
     From, TryInto,
 };
+use percent_encoding::{percent_decode_str, utf8_percent_encode, AsciiSet, CONTROLS};
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;
+
+const URL_COMPONENT: &AsciiSet = &CONTROLS
+    .add(b' ')
+    .add(b'"')
+    .add(b'#')
+    .add(b'$')
+    .add(b'%')
+    .add(b'&')
+    .add(b'+')
+    .add(b',')
+    .add(b'/')
+    .add(b':')
+    .add(b';')
+    .add(b'<')
+    .add(b'=')
+    .add(b'>')
+    .add(b'?')
+    .add(b'@')
+    .add(b'[')
+    .add(b'\\')
+    .add(b']')
+    .add(b'^')
+    .add(b'`')
+    .add(b'{')
+    .add(b'}')
+    .add(b'|');
 
 /// The key to a KV store is a pathname, `Path`, and allows heirarchical grouping of values.
 /// A path can be constructed with an expression such as:
@@ -85,7 +117,7 @@ impl Display for Path {
             buffer.push('/');
             match item {
                 PathItem::Number(n) => {
-                    url_escape::encode_component_to_string(n.to_string(), &mut buffer);
+                    write!(&mut buffer, "{n}")?;
                 }
                 PathItem::Name(c) => {
                     if let Some(x) = c.chars().next() {
@@ -93,7 +125,9 @@ impl Display for Path {
                             buffer.push('\'');
                         }
                     }
-                    url_escape::encode_component_to_string(c, &mut buffer);
+                    for segment in utf8_percent_encode(c, URL_COMPONENT) {
+                        buffer.push_str(segment);
+                    }
                 }
             }
         }
@@ -125,11 +159,19 @@ impl FromStr for Path {
                     PathItem::Number(raw_path_item.parse().map_err(ParseError::BadInt)?)
                 }
                 Some('\'') => {
-                    url_escape::decode_to_string(raw_path_item_iter.as_str(), &mut decode_buffer);
+                    decode_buffer.push_str(
+                        percent_decode_str(raw_path_item_iter.as_str())
+                            .decode_utf8_lossy()
+                            .as_ref(),
+                    );
                     PathItem::Name(SmolStr::from(&decode_buffer))
                 }
                 _ => {
-                    url_escape::decode_to_string(raw_path_item, &mut decode_buffer);
+                    decode_buffer.push_str(
+                        percent_decode_str(raw_path_item)
+                            .decode_utf8_lossy()
+                            .as_ref(),
+                    );
                     PathItem::Name(SmolStr::from(&decode_buffer))
                 }
             };
@@ -279,6 +321,14 @@ mod test {
     fn from_string_4() {
         let p = root() / "'CS" / 2;
         assert_eq!("/''CS/2".parse(), Ok(p));
+    }
+
+    #[test]
+    fn unicode_round_trip() {
+        let p = root() / "中文/🚀" / 7;
+        let encoded = p.to_string();
+        assert_eq!(encoded, "/%E4%B8%AD%E6%96%87%2F%F0%9F%9A%80/7");
+        assert_eq!(encoded.parse::<Path>(), Ok(p));
     }
 
     #[test]
