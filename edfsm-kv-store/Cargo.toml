@@ -16,10 +16,10 @@ derive_more = { workspace = true, features = [
     "into_iterator",
 ] }
 embassy-sync = { workspace = true, optional = true }
-serde = { workspace = true, features = ["derive"] }
+serde = { workspace = true, features = ["derive", "alloc"] }
 smol_str = { workspace = true, features = ["serde"] }
 tokio = { workspace = true, features = ["sync"], optional = true }
-url-escape = { workspace = true }
+percent-encoding = { workspace = true, features = ["alloc"] }
 
 edfsm = { workspace = true }
 edfsm-machine = { workspace = true, optional = true }
@@ -34,4 +34,4 @@ tokio = { workspace = true, features = ["full"] }
 default = ["tokio"]
 tokio = ["dep:tokio", "dep:edfsm-machine", "std"]
 embassy = ["dep:embassy-sync"]
-std = ["smol_str/std"]
+std = ["derive_more/std", "serde/std", "smol_str/std", "percent-encoding/std"]

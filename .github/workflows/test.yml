@@ -19,9 +19,11 @@ jobs:
     - name: Update Rust
       run: |
         rustup update
+        rustup target add thumbv7em-none-eabihf
     - uses: Swatinem/rust-cache@v2
     - name: Format, lint and test
       run: |
         cargo fmt -- --check
         cargo clippy --verbose
+        cargo build -p edfsm-kv-store --no-default-features --target thumbv7em-none-eabihf --verbose
         cargo test --workspace --verbose
